@@ -11,6 +11,11 @@ pygame.key.set_repeat()
 
 follow_cam = True
 
+# Teams
+ALLY = 0
+ENEMY = 1
+NEUTRAL = 1
+
 
 def debug():
     pass
@@ -22,6 +27,9 @@ def clamp(value, minval, maxval):
 def round_to(n, base):
     return base * round(float(n)/base)
 
+
+def dist(self, v):
+    return math.hypot(self.x - v.x, self.x - v.x)
 
 """ 2-component vector class """
 class Vec:
@@ -73,8 +81,8 @@ class Vec:
     def get_mag(self):
         return math.sqrt(self.x**2 + self.y**2)
     
-    """ Get the normalized vector, preserving the ratio of the components """
-    def get_norm(self):
+    """ Get the normalized vector, keeping the ratio of the components """
+    def norm(self):
         mag = self.get_mag()
         if mag == 0:
             return Vec(0, 0)
@@ -118,6 +126,7 @@ class Game:
         self.clock = pygame.time.Clock()
         
         self.entities = []
+        self.stat_entities = []
         self.worlds = []
         
         
@@ -131,7 +140,7 @@ class Game:
         size = self.screen.get_size()
         #self.size.set(size[0], size[0])
         #self.mouseX, self.mouseY = pygame.mouse.get_pos()
-        self.reset()
+        self.post_update()
         
 
     def render(self):
@@ -177,10 +186,24 @@ class Game:
         self.UP      = self.keys[pygame.K_w] or self.keys[pygame.K_UP]
         self.DOWN    = self.keys[pygame.K_s] or self.keys[pygame.K_DOWN]
             
-    def reset(self):
+    def post_update(self):
         self.KEY_TAPPED = False
         self.MOUSE_CLICKED = False
         #self.MOUSE_MOVED = False
+
+    def create(self):
+        pass
+
+    def add(self, entity):
+        self.entities.append(entity)
+        if entity.stats is not None:
+            self.stat_entities.append(entity)
+
+    def remove(self, entity):
+        self.entities.remove(entity)
+        if entity.stats is not None:
+            self.stat_entities.remove(entity)
+        del entity
 
 
 game = Game()
@@ -200,37 +223,58 @@ world_size = Vec(700, 700)
     def render(self):
         for entity in self.entities:
             entity.render()'''
-    
 
-class Entity:
-    def __init__(self, name, pos, size, color, circle = False):
-        self.name = name
-        #self.world = None
-        self.pos = Vec(pos)
+class Sprite:
+    def __init__(self, size, color, circle = False):
         self.size = Vec(size)
         self.circle = circle
         self.color = color
-        self.vel = Vec(0, 0)
-        
-    def update(self):
-        #self.vel = Vec(100, 100)
-        self.pos += self.vel
 
-        self.pos.x = clamp(self.pos.x, -world_size.x/2 + self.size.x/2,
-                           world_size.x/2 - self.size.x/2)
-        self.pos.y = clamp(self.pos.y, -world_size.y/2 + self.size.y/2, \
-                           world_size.y/2 - self.size.y/2)
-    
-    def render(self):
+    def render_at(self, pos):
         if self.circle:
             shape = pygame.draw.ellipse
         else:
             shape = pygame.draw.rect
-        shape(game.screen, self.color, self.get_hitbox(True))
+        
+        shape(game.screen, self.color, self.get_hitbox_at(pos))
+        
+    def get_hitbox_at(self, pos):
+        return pygame.Rect(pos.to_tuple(), self.size.to_tuple())
+
+
+class Stats:
+    def __init__(self, speed, health, team, damage = 0, invincible = True):
+        self.speed = speed
+        self.health = health
+        self.invincible = invincible
+        self.damage = damage
+        self.team = team
+
+
+
+class Entity:
+    def __init__(self, name, pos, sprite, stats = None):
+        self.name = name
+        #self.world = None
+        self.pos = Vec(pos)
+        self.sprite = sprite
+        self.vel = Vec(0, 0)
+        self.stats = stats
+
+    def render(self):
+        self.sprite.render_at(self.get_screen_pos())
+        
+    def update(self):
+        #self.vel = Vec(100, 100)
+        self.pos += self.vel
+        size = self.sprite.size
+        self.pos.x = clamp(self.pos.x, -world_size.x/2 + size.x/2,
+                           world_size.x/2 - size.x/2)
+        self.pos.y = clamp(self.pos.y, -world_size.y/2 + size.y/2, \
+                           world_size.y/2 - size.y/2)
     
     def get_screen_pos(self):
-        screen_pos = self.pos + game.size / 2 - self.size / 2
-
+        screen_pos = self.pos + game.size / 2 - self.sprite.size / 2
         # Offset by player position to follow player position
         if follow_cam:
             screen_pos -= player.pos
@@ -240,17 +284,16 @@ class Entity:
         pos = self.pos
         if screen:
             pos = self.get_screen_pos()
-        return pygame.Rect(pos.to_tuple(), self.size.to_tuple())
+        return self.sprite.get_hitbox_at(pos)#pygame.Rect(pos.to_tuple(), self.size.to_tuple())
     
     def __str__(self):
         return "{name} at {pos}".format(name = self.name, pos = self.pos)
-    
+
     
     
 class Player(Entity):
-    def __init__(self, pos, size, color, circle = False):
-        super().__init__("Player", pos, size, color, circle)
-        self.speed = 0.8
+    def __init__(self, pos, sprite, stats = None):
+        super().__init__("Player", pos, sprite, stats)
 
     def update(self):
         self.move()
@@ -277,27 +320,52 @@ class Player(Entity):
             
         # normalize and set magnitude so moving diagonal is not faster
         if pressing:
-            self.vel = vel.get_norm() * self.speed
+            self.vel = vel.norm() * self.stats.speed
         else:
             self.vel *= 0.96
 
     def fire(self):
         # add multiple types of weapons (triple, shotgun spread, big boi, 360, small angle range spread)
-        bullet = Projectile("Player Bullet", self.pos, Vec(10, 10), (0, 20, 50), 600)
-        bullet.vel.set((game.mouse_pos - Vec(self.get_hitbox(True).center)).get_norm() * 2)
+        bullet = Projectile("Player Bullet", self.pos, Sprite(Vec(10, 10), (0, 20, 50)), 600)
+        bullet.vel.set((game.mouse_pos - Vec(self.get_hitbox(True).center)).norm() * 2)
         
         # If camera is following player, add inertia to particle to make it aim towards mouse while moving
         if follow_cam:
             bullet.vel += self.vel
             
-        game.entities.append(bullet)
-
+        game.add(bullet)
         #print(bullet.vel.get_mag())
-    
+
+
+class AIEntity(Entity):
+    def __init__(self, name, pos, sprite, sight_range, stats):
+        super().__init__(name, pos, sprite, stats)
+        self.sight_range = sight_range
+        self.following = False
+        self.target_pos = Vec(0, 0)
+        
+    def update(self):
+        '''closest_entity = None
+        closest_dist = 1000
+        
+        for entity in game.stat_entities:
+            if self.stats.team == ALLY and entity.stats.team == ENEMY or \
+               self.stats.team == ENEMY and entity.stats.team == ALLY:
+
+                dist = dist(self.pos, entity.pos)
+
+                if dist < sight_range: 
+                    closest_entity = entity
+                    closest_dist = dist()
+                    
+            if closest_entity is not None:'''
+        #self.target_pos = player.pos#closest_entity.pos
+        vel = (player.pos - self.pos).norm() * self.stats.speed
+
 
 class Projectile(Entity):
-    def __init__(self, name, pos, size, color, Range, circle = True):
-        super().__init__(name, pos, size, color, circle)
+    def __init__(self, name, pos, sprite, Range, stats = None):
+        super().__init__(name, pos, sprite, stats)
         self.range = Range
         self.distance = 0
 
@@ -306,17 +374,19 @@ class Projectile(Entity):
         self.distance += abs(self.vel.get_mag()) # accumulate the change in position to get total distance
 
         if self.distance > self.range:
-            game.entities.remove(self)
-            del self
+            game.remove(self)
 
 
-    
+    #def update(self):
+        
 
-game.entities.append(Entity("Ground", Vec(0, 0), world_size, (220, 200, 140)))
+game.add(Entity("Ground", Vec(0, 0), Sprite(world_size, (220, 200, 140))))
 
+player = Player(Vec(0, 0), Sprite(Vec(50, 50), (255, 240, 0), True), Stats(0.8, 1000, ALLY, 0, False))
+game.add(player)
 
-player = Player(Vec(0, 0), Vec(50, 50), (255, 240, 0), True)
-game.entities.append(player)
+game.add(AIEntity("Enemy", Vec(300, 300), Sprite((75, 75), (90, 110, 90)), 500, Stats(0.6, 1000, ENEMY, 1, False)))
+
 print(player)
 
 
