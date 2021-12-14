@@ -19,6 +19,10 @@ class Vec:
             # if one argument, assume it's a vector & copy its components
             self.x = x
             self.y = y
+            
+    def set_polar(self, r, theta):
+        self.x = r * math.cos(theta)
+        self.y = r * math.sin(theta)
     
     def __add__(self, v):
         return Vec(self.x + v.x, self.y + v.y)
@@ -56,6 +60,4 @@ class Vec:
         if mag == 0:
             return Vec(0, 0)
         return Vec(self.x / mag, self.y / mag)
-
-    def to_tuple(self):
-        return (self.x, self.y)
+    
