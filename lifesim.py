@@ -38,14 +38,20 @@ def world_pos(v):
     return v - SIZE/2 + player.pos
 
 
-SIZE = Vec(1200, 900)
-SCREEN = pygame.display.set_mode((SIZE.x, SIZE.y))#, pygame.RESIZABLE)
+SIZE = Vec(0, 0)
+SCREEN = None
+
+def set_screen_size(size):
+    global SIZE, SCREEN
+    SIZE = Vec(size[0], size[1])
+    flags = pygame.RESIZABLE
+    SCREEN = pygame.display.set_mode((SIZE.x, SIZE.y), flags)
+
+set_screen_size((1200, 900))
+
 pygame.display.set_caption('lifesim')
-CLOCK = pygame.time.Clock()
+clock = pygame.time.Clock()
 FPS = 60
-
-
-follow_cam = True
 
 
 class World:
@@ -54,7 +60,7 @@ class World:
         self.color_bg = color_bg
         self.entities = []
         self.spawners = []
-        self.ground = Entity("Ground", Sprite(size, color_fg))
+        self.ground = Entity("Ground", Sprite(size, color_fg, False))
         self.add(Vec(0, 0), self.ground)
 
     def update(self):
@@ -67,11 +73,12 @@ class World:
                             e.collide(e2)
         for s in self.spawners:
             s.update()
-        
+
     def render(self):
         SCREEN.fill(self.color_bg)
         for e in self.entities:
             e.render()
+            
             
     def add(self, pos, e):
         e.pos = pos
@@ -135,7 +142,7 @@ class Sprite:
 
 
 class Stats:
-    def __init__(self, speed, health, team, damage = 0, invincible = False, destroy_on_hit = False):
+    def __init__(self, speed, health, team, damage = 0, invincible = False, destroy_on_hit = False, post_func = None, knockback = 0):
         self.entity = None
         self.speed = speed
         self.health = health
@@ -143,6 +150,8 @@ class Stats:
         self.damage = damage
         self.team = team
         self.destroy_on_hit = destroy_on_hit
+        self.post_func = post_func
+        self.knockback = knockback
 
     def update(self):
         self.health = max(0, self.health)
@@ -150,12 +159,16 @@ class Stats:
             self.destroy()
 
     def destroy(self):
+        print(self.entity.name + " be ded.")
+        if self.post_func is not None:
+            self.post_func(self.entity, self.team)
         if self.entity is player:
-            player.stats.speed = 0
+            if player.stats.speed !=0:
+                player.stats.speed = 0
         else:
             if self.entity is not None:
-                self.entity.world.remove(self.entity)
-        print(self.entity.name + " be ded.")
+                if self.entity.world is not None:
+                    self.entity.world.remove(self.entity)
 
     #def opposes(self, s):
     #    return self.team == ALLY and s.team == ENEMY or \
@@ -165,6 +178,7 @@ class Stats:
         if e.has_stats():
             if not e.stats.invincible:
                 e.stats.health -= self.damage
+                e.accel = (e.pos - self.entity.pos).norm() * self.knockback
             if self.destroy_on_hit:
                 self.destroy()
 
@@ -176,6 +190,7 @@ class Entity:
         self.pos = Vec(0, 0)
         self.sprite = sprite
         self.vel = Vec(0, 0)
+        self.accel = Vec(0, 0)
         self.stats = stats
         if self.has_stats():
             self.stats.entity = self
@@ -184,7 +199,11 @@ class Entity:
         self.sprite.render_at(self.get_screen_pos())
         
     def update(self):
+        self.vel += self.accel
+        self.accel *= 0.75
         self.pos += self.vel * delta_time
+        
+        #self.vel *= 0.98
         size = self.sprite.size
         world_size = self.world.size
         # keep sprite within world bounds (stays a "radius" length from wall)
@@ -269,101 +288,135 @@ class AIEntity(Entity):
 
 
 class Projectile(Entity):
-    def __init__(self, name, sprite, Range, stats = None):
+    def __init__(self, name, sprite, Range, stats):
         super().__init__(name, sprite, stats)
         self.range = Range
         self.distance = 0
 
     def update(self):
         super().update()
-        self.distance += abs(self.vel.get_mag()) # accumulate the change in position to get total distance
-        # hits wall if within "radius" length. Disappear
+        self.distance += abs(self.vel.get_mag() * delta_time) # accumulate the change in position to get total distance
+        # hits wall if within "radius" length. Disappear\
         if self.distance > self.range or not self.get_hitbox() \
         .colliderect(self.world.ground.get_hitbox().inflate(-self.sprite.size.x*2, -self.sprite.size.y*2)):
-            self.world.remove(self)
+            self.stats.destroy()
 
 
 class Weapon():
-    def __init__(self, spawn_func, repeat = 1, interval = 0, spread = 0):
+    def __init__(self, spawn_func, Range, repeat = 1, interval = 0, spread = 0):
         self.spawn_func = spawn_func
-        self.interval = interval # time (ms) between repeated shots (times)
-        self.timer = 0 # tracks time between shots
         self.repeat = repeat # number of shots per click
         self.current_repeat = 0
+        self.interval = interval # time (ms) between repeated shots (times)
+        self.timer = 0 # tracks time between shots
+        self.spread = spread
+        self.current_spread = 0
+        self.range = Range
         self.firing = False
 
     def fire(self):
         if self.current_repeat >= self.repeat:
             self.current_repeat = 0
+            self.current_spread = -self.spread/2
         
     def update(self, entity, team):
         if self.current_repeat < self.repeat:
-            if self.timer > self.interval and MOUSE_HELD[0]:
+            if self.timer > self.interval:# and MOUSE_HELD[0]:
                 self.summon_bullet(entity, team)
                 self.timer = 0
+                self.current_repeat += 1
+                if self.spread != 0:
+                    self.current_spread += self.spread/self.repeat
             self.timer += delta_time
 
     def summon_bullet(self, entity, team):
-        bullet = self.spawn_func(team)
-        bullet.vel = (MOUSE_POS - Vec(entity.get_hitbox(True).center)).norm() * bullet.stats.speed
-        # If camera is following player, transfer player's velocity to bullet to make it aim towards mouse while moving
-        if follow_cam and entity is player:
-            bullet.vel += entity.vel
+        bullet = self.spawn_func(team, self.range)
+        pos_diff = MOUSE_POS - Vec(entity.get_hitbox(True).center)
+        bullet.vel.set_polar(bullet.stats.speed, math.degrees(math.atan2(pos_diff.y, pos_diff.x)) + self.current_spread)
+        # Transfer player's velocity to bullet to make it aim towards mouse while moving
+        bullet.vel += entity.vel
         entity.world.add(entity.pos, bullet)
-        
-        self.current_repeat += 1
 
+
+class Pickup(Entity):
+    def __init__(self, name, sprite, func):
+        super().__init__(name, sprite)
+        self.func = func
+
+    def collide(self, e):
+        if e is player:
+            self.func()
+        super().collide()
 
 
 def spawn_enemy():
-    return AIEntity("Enemy", Sprite((60, 60), (230, 0, 0)), 300, Stats(0.35, 100, ENEMY, 1))
+    return AIEntity("Enemy", Sprite((60, 60), (230, 0, 0)), 400, Stats(0.35, 100, ENEMY, 1.125))
 
 def spawn_ally():
-    return AIEntity("Ally", Sprite((55, 55), (0, 50, 210)), 200, Stats(0.4, 100, ALLY, 1))
+    return AIEntity("Ally", Sprite((55, 55), (0, 50, 210)), 300, Stats(0.4, 100, ALLY, 1))
 
-def spawn_bullet(team):
-    return Projectile("Bullet", Sprite(Vec(15, 15), (25, 25, 75), True), 600, \
-                      Stats(1.5, 100, team, 100, invincible = True, destroy_on_hit = True))
+def spawn_bullet(team, Range):
+    return Projectile("Bullet", Sprite(Vec(12, 12), (25, 25, 75), True), Range, \
+                      Stats(1, 100, team, 0, invincible = True, destroy_on_hit = True, knockback = 0.25))
 
+def spawn_grenade(team, Range):
+    return Projectile("Grenade", Sprite(Vec(16, 16), (25, 25, 75), False), Range, \
+                      Stats(0.6, 100, team, 0, invincible = True, destroy_on_hit = True, post_func = explode))
+
+def spawn_fragment(team, Range):
+    return Projectile("Fragment", Sprite(Vec(20, 20), (240, 180, 50), True), Range, \
+                      Stats(0.2, 100, team, 10, invincible = True, destroy_on_hit = False, knockback = 0.1))
+    
+
+def explode(entity, team):
+    for i in range(6):
+        angle = i * 60
+        fragment = spawn_fragment(team, 100)
+        fragment.vel.set_polar(fragment.stats.speed, angle)
+        player.world.add(entity.pos, fragment)
+        
+    
 
 def debug(key, world_pos):
     if key == pygame.K_1:
-        print("1")
         player.weapon = standard_gun
-    if key == pygame.K_2:
-        print("2")
+    elif key == pygame.K_2:
         player.weapon = triple_gun
-    if key == pygame.K_3:
-        print("3")
+    elif key == pygame.K_3:
+        player.weapon = shotgun
+    elif key == pygame.K_4:
+        player.weapon = grenade
+    elif key == pygame.K_5:
         player.world.add(world_pos, spawn_enemy())
-    if key == pygame.K_4:
-        print("4")
+    elif key == pygame.K_6:
         player.world.add(world_pos, spawn_ally())
 
 
 MOUSE_HELD = []
 
 
+
 if __name__ == '__main__':
     
     worlds = []
     
-    standard_gun = Weapon(spawn_bullet)
-    triple_gun = Weapon(spawn_bullet, 3, 100)
+    standard_gun = Weapon(spawn_bullet, 600)
+    triple_gun = Weapon(spawn_bullet, 400, repeat = 3, interval = 100)
+    shotgun = Weapon(spawn_bullet, 300, repeat = 3, interval = 0, spread = 25)
+    grenade = Weapon(spawn_grenade, 300)
 
 
     overworld = World(Vec(1600, 1600), (86, 200, 93), (220, 200, 140))
     worlds.append(overworld)
 
 
-    player = Player(Sprite(Vec(50, 50), (255, 240, 0), True), Stats(0.5, 100, ALLY, 0), triple_gun)
+    player = Player(Sprite(Vec(50, 50), (255, 240, 0), True), Stats(0.5, 100, ALLY, 0, invincible = True), triple_gun)
     overworld.add(Vec(0, 0), player)
-
 
     overworld.create_spawner(Spawner(2000, spawn_enemy, 4))
     
     while True:
-        delta_time = CLOCK.tick(FPS) # time between each update cycle
+        delta_time = clock.tick(FPS) # time between each update cycle
         MOUSE_CLICKED = [False, False, False, False, False]
         events = pygame.event.get()
 
@@ -384,15 +437,15 @@ if __name__ == '__main__':
                 print("Exited")
                 pygame.quit()
                 sys.exit()
-            #elif event.type == pygame.VIDEORESIZE:
-            #    self.screen = pygs= False
+            elif event.type == pygame.VIDEORESIZE:
+                set_screen_size(event.size)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 MOUSE_CLICKED[event.button - 1] = True
-                print(event.button)
             elif event.type == pygame.MOUSEMOTION:
                 MOUSE_MOVED = True
             elif event.type == pygame.KEYDOWN:
                 debug(event.key, world_pos(MOUSE_POS))
+                #print(player.weapon)
 
         horizontal = False
         vertical = False
@@ -418,7 +471,6 @@ if __name__ == '__main__':
             player.vel.x = vel.x
         else:
             player.vel.x *= slide # slide to a standstill
-            
         if vertical:
             player.vel.y = vel.y
         else:

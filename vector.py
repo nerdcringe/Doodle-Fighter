@@ -21,8 +21,8 @@ class Vec:
             self.y = y
             
     def set_polar(self, r, theta):
-        self.x = r * math.cos(theta)
-        self.y = r * math.sin(theta)
+        self.x = r * math.cos(math.radians(theta))
+        self.y = r * math.sin(math.radians(theta))
     
     def __add__(self, v):
         return Vec(self.x + v.x, self.y + v.y)
@@ -53,6 +53,9 @@ class Vec:
     
     def get_mag(self):
         return math.sqrt(self.x**2 + self.y**2)
+
+    def get_angle(self):
+        return math.degrees(math.atan2(self.y, self.x))
     
     """ Get the normalized vector, keeping the ratio of the components """
     def norm(self):
