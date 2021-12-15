@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import sys
+import os
 import pygame
 import math
 import random
@@ -11,11 +12,12 @@ pygame.key.set_repeat()
 clock = pygame.time.Clock()
 FPS = 60
 
+RES_PATH = 'res/'
+
 # Teams (who follows and can damage who)
 ALLY = 0 # against ENEMY
 ENEMY = 1 # against ALLY
 NEUTRAL = 2 # followed by neither and can damage both
-
 
 
 def clamp(value, minval, maxval):
@@ -27,8 +29,27 @@ def round_to(n, base):
 def dist(self, v):
     return math.hypot(self.x - v.x, self.x - v.x)
 
+
+main_font = "StayPuft.ttf"
+fonts = {}
+
+def write(surface, text, font_name, size, pos, color, center=False):
+    if size in fonts:
+        Font = fonts[size]
+    else:
+        Font = pygame.font.Font(os.path.join(RES_PATH, font_name), size)
+        fonts[size] = Font
+    text = Font.render(text, 1, color)
+    
+    if center:
+        text_rect = text.get_rect(center=(pos.x, pos.y))
+    else:
+        text_rect = (pos.x, pos.y)
+    surface.blit(text, text_rect)
+
+
 def load_image(name):
-	image = pygame.image.load('Images/' + name).convert_alpha()
+	image = pygame.image.load(os.path.join(RES_PATH, 'img', name)).convert_alpha()
 	return image
 
 def screen_pos(v):
@@ -159,7 +180,7 @@ class Stats:
             self.destroy()
 
     def destroy(self):
-        print(self.entity.name + " be ded.")
+        #print(self.entity.name + " be ded.")
         if self.post_func is not None:
             self.post_func(self.entity, self.team)
         if self.entity is player:
@@ -303,7 +324,8 @@ class Projectile(Entity):
 
 
 class Weapon():
-    def __init__(self, spawn_func, Range, repeat = 1, interval = 0, spread = 0):
+    def __init__(self, name, spawn_func, Range, repeat = 1, interval = 0, spread = 0):
+        self.name = name
         self.spawn_func = spawn_func
         self.repeat = repeat # number of shots per click
         self.current_repeat = 0
@@ -348,6 +370,8 @@ class Pickup(Entity):
             self.func()
         super().collide()
 
+        
+
 
 def spawn_enemy():
     return AIEntity("Enemy", Sprite((60, 60), (230, 0, 0)), 400, Stats(0.35, 100, ENEMY, 1.125))
@@ -357,7 +381,7 @@ def spawn_ally():
 
 def spawn_bullet(team, Range):
     return Projectile("Bullet", Sprite(Vec(12, 12), (25, 25, 75), True), Range, \
-                      Stats(1, 100, team, 0, invincible = True, destroy_on_hit = True, knockback = 0.25))
+                      Stats(1, 100, team, 20, invincible = True, destroy_on_hit = True, knockback = 0.25))
 
 def spawn_grenade(team, Range):
     return Projectile("Grenade", Sprite(Vec(16, 16), (25, 25, 75), False), Range, \
@@ -366,7 +390,8 @@ def spawn_grenade(team, Range):
 def spawn_fragment(team, Range):
     return Projectile("Fragment", Sprite(Vec(20, 20), (240, 180, 50), True), Range, \
                       Stats(0.2, 100, team, 10, invincible = True, destroy_on_hit = False, knockback = 0.1))
-    
+
+
 
 def explode(entity, team):
     for i in range(6):
@@ -393,6 +418,32 @@ def debug(key, world_pos):
 
 
 MOUSE_HELD = []
+#def write(surface, text, fontFace, pos, size, color, center=False):
+def render_overlay():
+    color = (255, 255, 255)
+    stat_values = [
+        
+        {
+            "Name": "Weapon",
+            "Value": player.weapon.name
+        },
+        {
+            "Name": "Health",
+            "Value": player.stats.health
+        }
+    ]
+    x = 10
+    y = SIZE.y - 10
+    for stat in stat_values:
+        y -= 30
+        value = stat["Value"]
+        if type(value) == float:
+            value = round(value)
+            value = max(0, value,)
+        write(SCREEN, stat["Name"] + ": " + str(value), main_font, 30, Vec(x, y), color)
+        
+    #write(SCREEN, "Health: " + str(player.stats.health), main_font, 30, Vec(10, SIZE.y - 50), color)
+    #write(SCREEN, "Weapon: " + str(player.weapon.name), main_font, 30, Vec(10, SIZE.y - 75), color)
 
 
 
@@ -400,17 +451,17 @@ if __name__ == '__main__':
     
     worlds = []
     
-    standard_gun = Weapon(spawn_bullet, 600)
-    triple_gun = Weapon(spawn_bullet, 400, repeat = 3, interval = 100)
-    shotgun = Weapon(spawn_bullet, 300, repeat = 3, interval = 0, spread = 25)
-    grenade = Weapon(spawn_grenade, 300)
+    standard_gun = Weapon("Standard", spawn_bullet, 600)
+    triple_gun = Weapon("Triple gun", spawn_bullet, 400, repeat = 3, interval = 100)
+    shotgun = Weapon("Shotgun", spawn_bullet, 300, repeat = 3, interval = 0, spread = 25)
+    grenade = Weapon("Grenade", spawn_grenade, 300)
 
 
     overworld = World(Vec(1600, 1600), (86, 200, 93), (220, 200, 140))
     worlds.append(overworld)
 
 
-    player = Player(Sprite(Vec(50, 50), (255, 240, 0), True), Stats(0.5, 100, ALLY, 0, invincible = True), triple_gun)
+    player = Player(Sprite(Vec(50, 50), (255, 240, 0), True), Stats(0.5, 100, ALLY, 0, invincible = False), triple_gun)
     overworld.add(Vec(0, 0), player)
 
     overworld.create_spawner(Spawner(2000, spawn_enemy, 4))
@@ -484,6 +535,7 @@ if __name__ == '__main__':
             
         for world in worlds:
             world.render()
-
+            
+        render_overlay()
 
         pygame.display.flip()
