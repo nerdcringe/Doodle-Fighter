@@ -49,7 +49,7 @@ class Vec:
         return Vec(-self.x, -self.y)
 
     def __str__(self):
-        return "({x}, {y})".format(x = self.x, y = self.y)
+        return "({x}, {y})".format(x = round(self.x, 1), y = round(self.y, 1))
     
     def get_mag(self):
         return math.sqrt(self.x**2 + self.y**2)
