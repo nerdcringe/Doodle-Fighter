@@ -56,9 +56,12 @@ class Vec:
 
     def get_angle(self):
         return math.degrees(math.atan2(self.y, self.x))
+
+    def get_rounded(self):
+        return Vec(round(self.x), round(self.y))
     
     """ Get the normalized vector, keeping the ratio of the components """
-    def norm(self):
+    def get_norm(self):
         mag = self.get_mag()
         if mag == 0:
             return Vec(0, 0)

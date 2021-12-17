@@ -222,7 +222,7 @@ class Stats:
         if e.has_stats():
             if not e.stats.invincible:
                 e.stats.health -= self.damage
-                e.accel = (e.pos - self.entity.pos).norm() * self.knockback
+                e.accel = (e.pos - self.entity.pos).get_norm() * self.knockback
             if self.destroy_on_hit:
                 self.destroy()
 
@@ -334,7 +334,7 @@ class AIEntity(Entity):
             if self.colliding(self.target):
                 self.vel *= 0.99
             else:
-                self.vel = (self.target.pos - self.pos).norm() * self.stats.speed
+                self.vel = (self.target.pos - self.pos).get_norm() * self.stats.speed
         super().update()
 
 
@@ -344,6 +344,7 @@ class Projectile(Entity):
         self.range = Range
         self.distance = 0
         self.init_vel = Vec(0, 0)
+        self.lifetime = 0
 
     def shoot(self, angle, init_vel = Vec(0, 0)):
         self.vel.set_polar(self.stats.speed, angle)
@@ -355,10 +356,18 @@ class Projectile(Entity):
         # accumulate the change in position to get total distance
         relative_vel = self.vel - self.init_vel
         self.distance += abs(relative_vel.get_mag() * delta_time)
-        # hits wall if within "radius" length. Disappear\
-        if self.distance > self.range or not self.get_hitbox() \
-        .colliderect(self.world.ground.get_hitbox().inflate(-self.sprite.size.x*2, -self.sprite.size.y*2)):
+        
+        # hits wall if within "radius" length.
+        #world_rect = self.world.ground.get_hitbox().inflate(-self.sprite.size.x*2, -self.sprite.size.y*2)
+        outer_pos = Vec(abs(self.pos.x), abs(self.pos.y)) + self.sprite.size/2
+        ground_size = self.world.ground.sprite.size/2
+        # wall_dist > 0 when outer edge of sprite is outside world border
+        wall_dist = Vec(abs(outer_pos.x) - abs(ground_size.x), abs(outer_pos.y) - abs(ground_size.y))
+
+        
+        if self.distance > self.range or (wall_dist.x >= 0 or wall_dist.y >= 0) and self.lifetime > 0:
             self.stats.destroy()
+        self.lifetime += 1
 
 
 class Weapon():
@@ -411,14 +420,14 @@ class Pickup(Entity):
             self.func()
         super().collide()
 
-        
+
 
 
 def spawn_enemy():
-    return AIEntity("Enemy", Sprite((60, 60), (230, 0, 0)), 400, Stats(0.35, 100, ENEMY, 0.5))
+    return AIEntity("Enemy", Sprite((60, 60), (230, 60, 50)), 400, Stats(0.35, 100, ENEMY, 0.5))
 
 def spawn_ally():
-    return AIEntity("Ally", Sprite((55, 55), (0, 50, 210)), 300, Stats(0.4, 100, ALLY, 0.5))
+    return AIEntity("Ally", Sprite((55, 55), (40, 100, 230)), 300, Stats(0.4, 100, ALLY, 0.5))
 
 def spawn_bullet(team, Range):
     return Projectile("Bullet", Sprite(Vec(12, 12), (25, 25, 75), True), Range, \
@@ -489,7 +498,7 @@ def render_overlay():
         },
         {
             "Name": "Position",
-            "Value": player.pos
+            "Value": player.pos.get_rounded()
         },
         {
             "Name": "Health",
@@ -503,7 +512,7 @@ def render_overlay():
         value = stat["Value"]
         if type(value) == float:
             value = round(value)
-            value = max(0, value,)
+            value = max(0, value)
         write(SCREEN, stat["Name"] + ": " + str(value), main_font, 30, Vec(x, y), color)
         
     #write(SCREEN, "Health: " + str(player.stats.health), main_font, 30, Vec(10, SIZE.y - 50), color)
@@ -515,12 +524,14 @@ while True:
         
         worlds = []
 
-        overworld = World("Overworld", Vec(2000, 2000), (86, 200, 93), (220, 200, 140))
+        overworld = World("Overworld", Vec(2000, 2000), (80, 190, 90), (220, 200, 140))
         worlds.append(overworld)
-        city_world = World("City", Vec(3000, 3000), (130, 130, 130), (28, 189, 119))
+        city_world = World("City", Vec(2500, 2500), (180, 180, 180), (142, 245, 155))
         worlds.append(city_world)
-        cave_world = World("Cave", Vec(3000, 1200), (50, 56, 64), (18, 20, 23))
+        cave_world = World("Cave", Vec(2000, 1200), (21, 71, 52), (18, 20, 23))
         worlds.append(cave_world)
+        forest_world = World("Forest", Vec(3000, 3000), (55, 190, 75), (100, 90, 60))
+        worlds.append(forest_world)
 
         
         standard_gun = Weapon("Standard", spawn_bullet, 600)
@@ -529,10 +540,12 @@ while True:
         grenade = Weapon("Grenade", spawn_grenade, 250)
 
 
-        player = Player(Sprite(Vec(50, 50), (255, 240, 0), True), Stats(0.5, 100, ALLY, 0, invincible = False), triple_gun)
+        player = Player(Sprite(Vec(50, 50), (255, 240, 0), True), Stats(0.5, 100, ALLY, 0, invincible = False), standard_gun)
         overworld.add(Vec(0, 0), player)
 
-        overworld.create_spawner(Spawner(2000, spawn_enemy, 4))
+        overworld.create_spawner(Spawner(2000, spawn_enemy, 3))
+        city_world.create_spawner(Spawner(1500, spawn_enemy, 4))
+        cave_world.create_spawner(Spawner(1000, spawn_enemy, 5))
         
         while True:
             delta_time = clock.tick(FPS) # time between each update cycle
@@ -549,7 +562,7 @@ while True:
 
             MOUSE_HELD = pygame.mouse.get_pressed()
             MOUSE_POS = Vec(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
-            MOUSE_MOVED = False
+            #MOUSE_MOVED = False
             
             for event in events:
                 if event.type == pygame.QUIT:
@@ -560,8 +573,8 @@ while True:
                     set_screen_size(event.size)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     MOUSE_CLICKED[event.button - 1] = True
-                elif event.type == pygame.MOUSEMOTION:
-                    MOUSE_MOVED = True
+                #elif event.type == pygame.MOUSEMOTION:
+                #    MOUSE_MOVED = True
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, world_pos(MOUSE_POS))
                     #print(player.weapon)
@@ -586,8 +599,8 @@ while True:
                     vel += Vec(0, 1)
                     vertical = True
                     
-                # Normalize and set magnitude so moving diagonal is not faster
-                vel = vel.norm() * player.stats.speed
+                # get_normalize and set magnitude so moving diagonal is not faster
+                vel = vel.get_norm() * player.stats.speed
                 slide = 0.99
                 # Control whether each component moves or slides
                 if horizontal:
