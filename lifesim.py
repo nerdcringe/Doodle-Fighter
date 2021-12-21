@@ -20,8 +20,16 @@ ENEMY = 1 # against ALLY
 NEUTRAL = 2 # followed by neither and can damage both
 
 
-def clamp(value, minval, maxval):
-    return max(minval, min(value, maxval))
+def clamp(value, min_val, max_val):
+    return max(min_val, min(value, max_val))
+
+def wraparound(value, min_val, max_val):
+    Range = min_val - max_val - 1
+    if value > max_val:
+        value += Range
+    elif value < min_val:
+        value -= Range
+    return value
 
 def round_to(n, base):
     return base * round(float(n)/base)
@@ -70,6 +78,11 @@ def screen_pos(v):
 def world_pos(v):
     return v - SIZE/2 + player.pos
 
+def rect_center(pos, size):
+    rect = pygame.Rect(0, 0, size.x, size.y)
+    rect.center = (pos.x, pos.y)
+    return rect
+
 
 SIZE = Vec(0, 0)
 SCREEN = None
@@ -95,7 +108,7 @@ class World:
         self.entities = []
         self.spawners = []
         self.ground = Entity("Ground", Sprite(size, color_fg, False))
-        self.add(Vec(0, 0), self.ground)
+        self.border = True
 
     def update(self):
         for e in self.entities:
@@ -110,9 +123,12 @@ class World:
 
     def render(self):
         SCREEN.fill(self.color_bg)
+        self.ground.render()
+        
+        self.entities.sort(key = lambda e: e.pos.y + e.sprite.size.y/2)
+        
         for e in self.entities:
             e.render()
-            
             
     def add(self, pos, e):
         e.pos = pos
@@ -133,11 +149,23 @@ class World:
     def create_spawner(self, spawner):
         self.spawners.append(spawner)
         spawner.world = self
-        
+
+    def clamp_pos(self, pos, size):
+        # keep entity within world bounds (stays a "radius" length from wall)
+        if self.border:
+            pos.x = clamp(pos.x, \
+                              -self.size.x/2 + size.x/2, \
+                               self.size.x/2 - size.x/2)
+            pos.y = clamp(pos.y, \
+                              -self.size.y/2 + size.y/2, \
+                               self.size.y/2 - size.y/2)
+        return pos
+    
     def rand_pos(self):
         x = self.size.x
         y = self.size.y
         return Vec(random.randint(-x/2, x/2), random.randint(-y/2, y/2))
+    
 
 
 class Spawner:
@@ -159,38 +187,37 @@ class Spawner:
 
 
 class Sprite:
-    def __init__(self, size, color, circle = False, image_name = None):
-        self.size = Vec(size)
+    def __init__(self, size, color = None, circle = False, image_name = None, flip = False):
+        self.size = size
         self.color = color
         self.circle = circle
         if image_name is not None:
             self.image = load_image(image_name)
+            if flip:
+                self.image = pygame.transform.flip(self.image, True, False)
         else:
             self.image = None
-        
-
+    
     def render_at(self, pos):
         # Only draw shape if color is specified
+        rect = rect_center(pos, self.size)
         if self.color is not None:
             if self.circle:
                 shape = pygame.draw.ellipse
             else:
                 shape = pygame.draw.rect
-            shape(SCREEN, self.color, self.get_hitbox_at(pos))
-        # Image may be overlaid on shape
-        if self.image is not None:
+            shape(SCREEN, self.color, rect)
+            
+        if self.image is not None: # Image may be overlayed on shape
             img_surf = pygame.transform.scale(self.image, (int(self.size.x), int(self.size.y)))
-            SCREEN.blit(img_surf, self.rect)
-        
-    def get_hitbox_at(self, pos):
-        return pygame.Rect((pos.x, pos.y), (self.size.x, self.size.y))
-
+            SCREEN.blit(img_surf, rect)
 
 class Stats:
-    def __init__(self, speed, health, team, damage = 0, invincible = False, destroy_on_hit = False, post_func = None, knockback = 0):
+    def __init__(self, speed, max_health, team, damage = 0, invincible = False, destroy_on_hit = False, post_func = None, knockback = 0):
         self.entity = None
         self.speed = speed
-        self.health = health
+        self.max_health = max_health
+        self.health = max_health
         self.invincible = invincible
         self.damage = damage
         self.team = team
@@ -203,6 +230,11 @@ class Stats:
         if self.health <= 0:
             self.destroy()
 
+    def opposes(self, e):
+        return (self.team == ALLY and e.team == ENEMY) \
+            or (self.team == ENEMY and e.team == ALLY) \
+            or (self.team == NEUTRAL)
+        
     def destroy(self):
         #print(self.entity.name + " be ded.")
         if self.post_func is not None:
@@ -213,31 +245,45 @@ class Stats:
             if self.entity is not None:
                 if self.entity.world is not None:
                     self.entity.world.remove(self.entity)
-
-    #def opposes(self, s):
-    #    return self.team == ALLY and s.team == ENEMY or \
-               #self.team == ENEMY and s.team == ALLY
     
     def attack(self, e):
-        if e.has_stats():
+        if self.opposes(e.stats):
             if not e.stats.invincible:
                 e.stats.health -= self.damage
                 e.accel = (e.pos - self.entity.pos).get_norm() * self.knockback
             if self.destroy_on_hit:
                 self.destroy()
+                    
+        if self.destroy_on_hit and e.solid:
+            self.destroy()
+
+"""
+class PlayerStats(Stats):
+    def __init__(self, speed, max_health, team, max_energy):
+        super().__init__(speed, max_health, ALLY, damage = 0, invincible = False, destroy_on_hit = False)
+        self.energy = max_energy
+        self.max_energy = max_energy
+        self.money = money
+"""
 
 
 class Entity:
-    def __init__(self, name, sprite, stats = None):
+    def __init__(self, name, sprite, stats = Stats(0, 1, NEUTRAL, invincible = True), hitbox = None, solid = False):
         self.name = name
         self.world = None
         self.pos = Vec(0, 0)
         self.sprite = sprite
+        self.stats = stats
+        self.stats.entity = self
+        
+        if hitbox is None:
+            self.hitbox = Vec(self.sprite.size)
+        else:
+            self.hitbox = hitbox
+            
+        self.solid = solid
         self.vel = Vec(0, 0)
         self.accel = Vec(0, 0)
-        self.stats = stats
-        if self.has_stats():
-            self.stats.entity = self
 
     def render(self):
         self.sprite.render_at(self.get_screen_pos())
@@ -246,9 +292,9 @@ class Entity:
         #self.vel += self.accel
         #self.accel *= 0.75
         self.pos += self.vel * delta_time
+        self.pos = self.world.clamp_pos(self.pos, self.hitbox)
         
-        #self.vel *= 0.98
-        size = self.sprite.size
+        """size = self.sprite.size
         world_size = self.world.size
         # keep sprite within world bounds (stays a "radius" length from wall)
         self.pos.x = clamp(self.pos.x,
@@ -256,58 +302,38 @@ class Entity:
                            world_size.x/2 - size.x/2)
         self.pos.y = clamp(self.pos.y,
                            -world_size.y/2 + size.y/2, \
-                           world_size.y/2 - size.y/2)
-        if self.has_stats():
-            self.stats.update()
+                           world_size.y/2 - size.y/2)"""
+        self.stats.update()
 
     def colliding(self, e):
         return self.get_hitbox().colliderect(e.get_hitbox())
         
-    def opposes(self, e):
-        if self.has_stats() and e.has_stats():
-            #return self.stats.opposes(e.stats)
-            return (self.stats.team == ALLY and e.stats.team == ENEMY) \
-            or (self.stats.team == ENEMY and e.stats.team == ALLY) \
-            or (self.stats.team == NEUTRAL)
-        
-        
     def collide(self, e):
-        #if self.has_stats() and e.has_stats():
-            #if self.stats.opposes(e):
-        if self.opposes(e):
-            self.stats.attack(e)
+        self.stats.attack(e)
     
     def get_screen_pos(self):
         # Offset by player position to follow player position
-        #screen_pos = screen_pos()#self.pos + SIZE/2 - self.sprite.size/2 - player.pos
-        return screen_pos(self.pos) - self.sprite.size/2
+        return screen_pos(self.pos)
     
     def get_hitbox(self, screen = False):
-        pos = self.pos - self.sprite.size/2
+        pos = self.pos
         if screen:
-            pos = self.get_screen_pos()
-        return self.sprite.get_hitbox_at(pos)
+            pos = screen_pos(self.pos)
+        return rect_center(pos, self.hitbox)
 
     def set_world(self, world):
         self.world.remove(self)
         world.add(Vec(0, 0), self)
-
-    def has_stats(self):
-        return self.stats is not None
 
     def __str__(self):
         return "{name} at {pos}".format(name = self.name, pos = self.pos)
 
 
 class Player(Entity):
-    def __init__(self, sprite, stats, weapon):
+    def __init__(self, sprite, stats):
         super().__init__("Player", sprite, stats)
-        self.weapon = weapon
         self.dead = False
-
-    def update(self):
-        self.weapon.update(self, self.stats.team)
-        super().update()
+        #self.inventory = inventory
 
 
 class AIEntity(Entity):
@@ -319,7 +345,7 @@ class AIEntity(Entity):
     def update(self):
         following_last = self.target is not None
         targetable = list(filter(lambda e: \
-            dist(self.pos, e.pos) < self.sight_range and self.opposes(e), \
+            dist(self.pos, e.pos) < self.sight_range and self.stats.opposes(e.stats), \
             self.world.entities))
         
         if len(targetable) > 0:
@@ -356,23 +382,49 @@ class Projectile(Entity):
         # accumulate the change in position to get total distance
         relative_vel = self.vel - self.init_vel
         self.distance += abs(relative_vel.get_mag() * delta_time)
-        
-        # hits wall if within "radius" length.
-        #world_rect = self.world.ground.get_hitbox().inflate(-self.sprite.size.x*2, -self.sprite.size.y*2)
-        outer_pos = Vec(abs(self.pos.x), abs(self.pos.y)) + self.sprite.size/2
-        ground_size = self.world.ground.sprite.size/2
-        # wall_dist > 0 when outer edge of sprite is outside world border
-        wall_dist = Vec(abs(outer_pos.x) - abs(ground_size.x), abs(outer_pos.y) - abs(ground_size.y))
 
+        hits_border = False
+
+        if self.world.border:
+            # hits border if within "radius" length.
+            outer_pos = Vec(abs(self.pos.x), abs(self.pos.y)) + self.sprite.size/2
+            ground_size = self.world.ground.sprite.size/2
+            
+            # wall_dist > 0 when outer edge of sprite is outside world border
+            wall_dist = Vec(abs(outer_pos.x) - abs(ground_size.x), abs(outer_pos.y) - abs(ground_size.y))
+            hits_border = (wall_dist.x >= 0 or wall_dist.y >= 0) and self.lifetime > 0
         
-        if self.distance > self.range or (wall_dist.x >= 0 or wall_dist.y >= 0) and self.lifetime > 0:
+        if self.distance > self.range or hits_border:
             self.stats.destroy()
         self.lifetime += 1
 
 
-class Weapon():
-    def __init__(self, name, spawn_func, Range, repeat = 1, interval = 0, spread = 0):
+class Item():
+    def __init__(self, name):
         self.name = name
+        self.in_use = False
+    def click(self):
+        pass
+    def update(self, entity, team):
+        pass
+
+
+class SummonerItem(Item):
+    
+    def __init__(self, name, spawn_func):
+        super().__init__(name)
+        self.spawn_func = spawn_func
+        
+    def click(self):
+        player.world.add(world_pos(MOUSE_POS), self.spawn_func())
+    
+    def update(self, entity, team):
+        pass
+
+
+class WeaponItem(Item):
+    def __init__(self, name, spawn_func, Range, repeat = 1, interval = 0, spread = 0):
+        super().__init__(name)
         self.spawn_func = spawn_func
         self.repeat = repeat # number of shots per click
         self.current_repeat = self.repeat
@@ -381,15 +433,18 @@ class Weapon():
         self.spread = spread
         self.current_spread = 0
         self.range = Range
-        self.firing = False
 
-    def fire(self):
+    def click(self):
+        super().click()
         if self.current_repeat >= self.repeat:
             self.current_repeat = 0
             self.current_spread = -self.spread/2
+            self.timer = self.interval
         
     def update(self, entity, team):
+        super().update(entity, team)
         if self.current_repeat < self.repeat:
+            self.in_use = True
             if self.timer > self.interval:# and MOUSE_HELD[0]:
                 self.summon_bullet(entity, team)
                 self.timer = 0
@@ -397,6 +452,8 @@ class Weapon():
                 if self.spread != 0:
                     self.current_spread += self.spread/self.repeat
             self.timer += delta_time
+        else:
+            self.in_use = False
 
     def summon_bullet(self, entity, team):
         bullet = self.spawn_func(team, self.range)
@@ -422,25 +479,62 @@ class Pickup(Entity):
 
 
 
+class Inventory():
+    def __init__(self):
+        self.contents = {
+            triple_gun: 100,
+            shotgun: 100,
+            grenade: 100,
+            ally_summoner: 100
+        }
 
-def spawn_enemy():
-    return AIEntity("Enemy", Sprite((60, 60), (230, 60, 50)), 400, Stats(0.35, 100, ENEMY, 0.5))
+        self.index = 0
+        self.selected = None
+    
+    def add(self, item, quantity):
+        self.contents[item] += quantity
 
-def spawn_ally():
-    return AIEntity("Ally", Sprite((55, 55), (40, 100, 230)), 300, Stats(0.4, 100, ALLY, 0.5))
+    def has_item():
+        if item in self.inventory.keys():
+            return self.inventory[item] > 0
+        return False
+
+    def remove(self, item):
+        if has_item(item):
+            self.contents[item] -= 1
+
+    def update(self, clicked, scroll):
+        if scroll != 0:
+            self.index += clamp(scroll, -1, 1)
+            
+        self.index = wraparound(self.index, 0, len(inventory.contents) - 1)
+        self.selected = items[self.index]
+        
+        if self.selected is not None:
+            if clicked:
+                self.selected.click()
+            self.selected.update(player, player.stats.team)
+    
+
+
+def spawn_enemy(team = ENEMY):
+    return AIEntity("Enemy", Sprite(Vec(60, 60), (230, 60, 50)), 400, Stats(0.35, 100, team, 0.5))
+
+def spawn_ally(team = ALLY):
+    return AIEntity("Ally", Sprite(Vec(55, 55), (40, 100, 230)), 300, Stats(0.4, 100, team, 0.5))
+
 
 def spawn_bullet(team, Range):
-    return Projectile("Bullet", Sprite(Vec(12, 12), (25, 25, 75), True), Range, \
-                      Stats(0.9, 100, team, 20, invincible = True, destroy_on_hit = True, knockback = 0.0))
+    return Projectile("Bullet", Sprite(Vec(12, 12), (10, 10, 40), True), Range, \
+                      Stats(0.9, 100, team, damage = 20, invincible = True, destroy_on_hit = True, knockback = 0.0))
 
 def spawn_grenade(team, Range):
     return Projectile("Grenade", Sprite(Vec(16, 16), (25, 25, 75), False), Range, \
-                      Stats(0.75, 100, team, 0, invincible = True, destroy_on_hit = True, post_func = explode))
+                      Stats(0.75, 100, team, damage = 0, invincible = True, destroy_on_hit = True, post_func = explode))
 
 def spawn_fragment(team, Range):
     return Projectile("Fragment", Sprite(Vec(30, 30), (240, 160, 50), True), Range, \
-                      Stats(0.3, 100, NEUTRAL, 2, invincible = True, destroy_on_hit = False, knockback = 0.0))
-
+                      Stats(0.25, 100, NEUTRAL, damage = 4, invincible = True, destroy_on_hit = False, knockback = 0.0))
 
 
 def explode(entity, team):
@@ -452,32 +546,22 @@ def explode(entity, team):
         
 
 
-def debug(key, world_pos):
-    if key == pygame.K_1:
-        player.weapon = standard_gun
-    elif key == pygame.K_2:
-        player.weapon = triple_gun
-    elif key == pygame.K_3:
-        player.weapon = shotgun
-    elif key == pygame.K_4:
-        player.weapon = grenade
-    elif key == pygame.K_5:
-        player.world.add(world_pos, spawn_enemy())
-    elif key == pygame.K_6:
-        player.world.add(world_pos, spawn_ally())
-        
-    elif key == pygame.K_h:
+def debug(key, mouse_world_pos):
+    if key == pygame.K_j:
+        player.world.add(mouse_world_pos, spawn_enemy())
+    if key == pygame.K_k:
+        player.world.add(mouse_world_pos, spawn_ally())
+    if key == pygame.K_h:
         player.dead = False
         player.stats.health += 100
     elif key == pygame.K_b:
         index = worlds.index(player.world) - 1
-        if index < 0:
-            index = len(worlds) - 1
+        index = wraparound(index, 0, len(worlds) - 1)
         player.set_world(worlds[index])
+        
     elif key == pygame.K_n:
         index = worlds.index(player.world) + 1
-        if index >= len(worlds):
-            index = 0
+        index = wraparound(index, 0, len(worlds) - 1)
         player.set_world(worlds[index])
     
 
@@ -486,37 +570,19 @@ MOUSE_HELD = []
 #def write(surface, text, fontFace, pos, size, color, center=False):
 def render_overlay():
     color = (255, 255, 255)
-    stat_values = [
-        
-        {
-            "Name": "Weapon",
-            "Value": player.weapon.name
-        },
-        {
-            "Name": "World",
-            "Value": player.world.name
-        },
-        {
-            "Name": "Position",
-            "Value": player.pos.get_rounded()
-        },
-        {
-            "Name": "Health",
-            "Value": player.stats.health
-        }
+
+    stat_texts = [
+        "Item: " + inventory.selected.name,
+        "World: " + player.world.name,
+        "Position: " + str(player.pos.get_rounded()),
+        "Health: " + str(max(0, round(player.stats.health))),
     ]
     x = 10
     y = SIZE.y - 10
-    for stat in stat_values:
+    for stat in stat_texts:
         y -= 30
-        value = stat["Value"]
-        if type(value) == float:
-            value = round(value)
-            value = max(0, value)
-        write(SCREEN, stat["Name"] + ": " + str(value), main_font, 30, Vec(x, y), color)
-        
-    #write(SCREEN, "Health: " + str(player.stats.health), main_font, 30, Vec(10, SIZE.y - 50), color)
-    #write(SCREEN, "Weapon: " + str(player.weapon.name), main_font, 30, Vec(10, SIZE.y - 75), color)
+        write(SCREEN, stat, main_font, 30, Vec(x, y), color)
+
 
 
 while True:
@@ -524,28 +590,49 @@ while True:
         
         worlds = []
 
-        overworld = World("Overworld", Vec(2000, 2000), (80, 190, 90), (220, 200, 140))
+        overworld = World("Overworld", Vec(2000, 2000), (80, 170, 90), (220, 200, 140))
         worlds.append(overworld)
         city_world = World("City", Vec(2500, 2500), (180, 180, 180), (142, 245, 155))
         worlds.append(city_world)
-        cave_world = World("Cave", Vec(2000, 1200), (21, 71, 52), (18, 20, 23))
+        cave_world = World("Cave", Vec(2000, 1200), (65, 65, 65), (25, 25, 25))
         worlds.append(cave_world)
-        forest_world = World("Forest", Vec(3000, 3000), (55, 190, 75), (100, 90, 60))
+        forest_world = World("Forest", Vec(2000, 2000), (35, 75, 65), (13, 46, 37))
         worlds.append(forest_world)
 
+
+        single_gun = WeaponItem("Single gun", spawn_bullet, 700)
+        triple_gun = WeaponItem("Triple gun", spawn_bullet, 450, repeat = 3, interval = 125)
+        shotgun = WeaponItem("Shotgun", spawn_bullet, 300, repeat = 3, interval = 0, spread = 25)
+        grenade = WeaponItem("Grenade", spawn_grenade, 250)
+        ally_summoner = SummonerItem("Spawn Ally", spawn_ally)
         
-        standard_gun = Weapon("Standard", spawn_bullet, 600)
-        triple_gun = Weapon("Triple gun", spawn_bullet, 400, repeat = 3, interval = 100)
-        shotgun = Weapon("Shotgun", spawn_bullet, 300, repeat = 3, interval = 0, spread = 25)
-        grenade = Weapon("Grenade", spawn_grenade, 250)
+        items = (
+            single_gun,
+            triple_gun,
+            shotgun,
+            grenade,
+            ally_summoner
+        )
+        inventory = Inventory()
 
-
-        player = Player(Sprite(Vec(50, 50), (255, 240, 0), True), Stats(0.5, 100, ALLY, 0, invincible = False), standard_gun)
+        player = Player(Sprite(Vec(55, 55), (255, 240, 0), circle = True, image_name = "meep.png"), Stats(0.5, 200, ALLY, 0, invincible = False))
         overworld.add(Vec(0, 0), player)
+
+        for i in range(8):
+            pos = overworld.rand_pos() * 1.75 # random position, spread out from center
+            overworld.add(pos, Entity("Tree", Sprite(Vec(150, 150), image_name = "tree.png", flip = random.randint(0, 1)), \
+                                      hitbox = Vec(50, 150), solid = True))
+
+        for i in range(20):
+            pos = forest_world.rand_pos() * 1.25
+            forest_world.add(pos, Entity("Winter Tree", Sprite(Vec(150, 300), image_name = "tree_winter.png", flip = random.randint(0, 1)), \
+                                         hitbox = Vec(30, 300), solid = True))
 
         overworld.create_spawner(Spawner(2000, spawn_enemy, 3))
         city_world.create_spawner(Spawner(1500, spawn_enemy, 4))
         cave_world.create_spawner(Spawner(1000, spawn_enemy, 5))
+
+        inv_slot = 0
         
         while True:
             delta_time = clock.tick(FPS) # time between each update cycle
@@ -562,6 +649,7 @@ while True:
 
             MOUSE_HELD = pygame.mouse.get_pressed()
             MOUSE_POS = Vec(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
+            MOUSE_SCROLL = 0
             #MOUSE_MOVED = False
             
             for event in events:
@@ -571,13 +659,15 @@ while True:
                     sys.exit()
                 elif event.type == pygame.VIDEORESIZE:
                     set_screen_size(event.size)
+                elif event.type == pygame.MOUSEWHEEL:
+                    MOUSE_SCROLL = event.y
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    MOUSE_CLICKED[event.button - 1] = True
+                    if event.button <= 3:
+                        MOUSE_CLICKED[event.button - 1] = True
                 #elif event.type == pygame.MOUSEMOTION:
                 #    MOUSE_MOVED = True
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, world_pos(MOUSE_POS))
-                    #print(player.weapon)
 
             if KEYS[pygame.K_r]:
                 break
@@ -615,12 +705,11 @@ while True:
             else:
                 player.vel = Vec(0, 0)
 
+            inventory.update(MOUSE_CLICKED[0], MOUSE_SCROLL)
+
             player.world.update()
-            
-            if MOUSE_CLICKED[0]:# or (MOUSE_HELD[0] and MOUSE_MOVED):
-                player.weapon.fire()
-                
             player.world.render()
+            
             render_overlay()
 
             pygame.display.flip()
