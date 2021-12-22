@@ -43,7 +43,7 @@ class Vec:
         return Vec(self.x / c, self.y / c)
     
     def __eq__(self, v):
-         return self.x == v.x and self.y == v.y
+        return self.x == v.x and self.y == v.y
         
     def __neg__(self):
         return Vec(-self.x, -self.y)
