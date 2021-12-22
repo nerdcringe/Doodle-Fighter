@@ -13,9 +13,9 @@ FPS = 60
 RES_PATH = 'res/'
 
 # Teams (who follows and can damage who)
-ALLY = 0 # against ENEMY
-ENEMY = 1 # against ALLY
-NEUTRAL = 2 # followed by neither and can damage both
+ALLY = 0            # Follows and damages ENEMY, avoids ALLY (to space out)
+ENEMY = 1           # Follows and damages ALLY, avoids ENEMY
+NEUTRAL = 2         # Follows BOTH (if has AI) and damages BOTH
 
 show_hitboxes = False
 
@@ -233,7 +233,7 @@ class Sprite:
 
 
 class Stats:
-    def __init__(self, speed, max_health, team, damage = 0, invincible = False, destroy_on_hit = False, post_func = None, knockback = 0):
+    def __init__(self, speed, max_health, team, damage = 0, invincible = False, destroy_on_hit = False, post_func = None, knockback = 0, avoid = False):
         self.entity = None
         self.speed = speed
         self.max_health = max_health
@@ -244,17 +244,30 @@ class Stats:
         self.destroy_on_hit = destroy_on_hit
         self.post_func = post_func
         self.knockback = knockback
+        self.avoid = avoid
 
     def update(self):
         self.health = max(0, self.health)
         if self.health <= 0:
             self.destroy()
 
-    def opposes(self, e):
-        return (self.team == ALLY and e.team == ENEMY) \
-            or (self.team == ENEMY and e.team == ALLY) \
-            or (self.team == NEUTRAL)
-        
+    def follows(self, s):
+        # Entities follow opposing entities
+        return (self.team == ALLY and (s.team == ENEMY and not s.avoid)) \
+            or (self.team == ENEMY and (s.team == ALLY and not s.avoid))
+    
+    def damages(self, s):
+        # Entities damage enemy, neutral damages all
+        return (self.team == ALLY and s.team == ENEMY) \
+            or (self.team == ENEMY and s.team == ALLY) \
+            or self.team == NEUTRAL
+    
+    def avoids(self, s):
+        # Avoids own team to space out
+        # Avoid opposing team if specified to avoid
+        return (self.team == ALLY and (s.team == ALLY or (s.team == ENEMY and s.avoid))) \
+            or (self.team == ENEMY and (s.team == ENEMY or (s.team == ALLY and s.avoid)))
+
     def destroy(self):
         #print(self.entity.name + " be ded.")
         if self.post_func is not None:
@@ -267,10 +280,10 @@ class Stats:
                     self.entity.world.remove(self.entity)
     
     def attack(self, e):
-        if self.opposes(e.stats):
+        if self.damages(e.stats):
             if not e.stats.invincible:
                 e.stats.health -= self.damage
-                e.accel = (e.pos - self.entity.pos).get_norm() * self.knockback
+
             if self.destroy_on_hit:
                 self.destroy()
 
@@ -291,7 +304,6 @@ class Entity:
             
         self.solid = solid
         self.vel = Vec(0, 0)
-        self.accel = Vec(0, 0)
 
     def render(self):
         self.sprite.render_at(screen_pos(self.pos))
@@ -299,8 +311,6 @@ class Entity:
             pygame.draw.rect(SCREEN, (255, 0, 0), self.get_hitbox(True))
         
     def update(self):
-        #self.vel += self.accel
-        #self.accel *= 0.75
         self.pos += self.vel * delta_time
         #if abs(self.vel.x) < 0.01:
         #    self.vel.x = 0
@@ -356,44 +366,36 @@ class AIEntity(Entity):
     def __init__(self, name, sprite, sight_range, stats):
         super().__init__(name, sprite, stats)
         self.sight_range = sight_range
-        self.target = None
 
+    def accel(self, target_pos, magnitude): # positive magnitude is towards target, negative is away
+        self.vel += (target_pos - self.pos).get_norm() * magnitude
+
+    def can_follow(self, e):
+        return dist(self.pos, e.pos) < self.sight_range and self.stats.follows(e.stats)
+   
+    def can_avoid(self, e):
+        return dist(self.pos, e.pos) < self.sight_range and self.stats.avoids(e.stats)
+        
     def update(self):
-        following_last = self.target is not None
-        
-        targetable = list(filter(lambda e: \
-            dist(self.pos, e.pos) < self.sight_range and self.stats.opposes(e.stats), \
-            self.world.entities))
-        
-        allies = list(filter(lambda e: \
-            dist(self.pos, e.pos) < self.sight_range and not self.stats.opposes(e.stats), \
-            self.world.entities))
-        
-        if len(targetable) > 0:
-            self.target = max(targetable, key = lambda e: dist(self.pos, e.pos))
-        else:
-            self.target = None
-            
-        if self.target is None:
-            # slow down when not moving
-            self.vel *= 0.98
-            # randomly change direction
-            if random.randint(0, 1000) < 5:
+        follow = list(filter(self.can_follow, self.world.entities))
+        avoid = list(filter(self.can_avoid, self.world.entities))
+
+        if len(follow) == 0 and len(avoid) == 0:
+            self.vel *= 0.98 # Slow down when not following or avoiding anything
+            if random.randint(0, 1000) < 5: # Randomly change direction, resetting speed
                 self.vel.set_polar(self.stats.speed*0.5, random.randint(0, 360))
         else:
-            if self.colliding(self.target):
-                self.vel *= 0.98
-            else:
-                # gravitate towards target and away from allies
-                self.vel += (self.target.pos - self.pos).get_norm() * 0.05
-
-                for ally in allies:
-                    self.vel -= (ally.pos - self.pos).get_norm() * 0.0075
-                
-                if self.vel.get_mag() > self.stats.speed:
-                    self.vel = self.vel.get_norm() * self.stats.speed
-                #self.vel = self.vel.get_norm() * self.stats.speed
-                #self.vel = (self.target.pos - self.pos).get_norm() * self.stats.speed
+            # Accel towards follow entities and away from avoid entities
+            for e in follow:
+                d = dist(self.pos, e.pos)
+                self.accel(e.pos, 0.05)
+            for e in avoid:
+                d = dist(self.pos, e.pos)
+                self.accel(e.pos, -0.005)
+        # Limit speed if over stats.speed
+        if self.vel.get_mag() > self.stats.speed:
+            self.vel = self.vel.get_norm() * self.stats.speed
+            
         super().update()
 
 
@@ -486,6 +488,7 @@ class WeaponItem(Item):
         
     def update(self, entity, team):
         super().update(entity, team)
+        
         if self.current_repeat < self.repeat:
             self.in_use = True
             if self.timer >= self.interval:# and MOUSE_HELD[0]:
@@ -569,23 +572,23 @@ def spawn_rock():
 
 
 def spawn_enemy(team = ENEMY):
-    return AIEntity("Enemy", Sprite(Vec(75, 75), (230, 60, 50), image_name = "enemy.png"), 400, Stats(0.48, 100, team, 0.75))
+    return AIEntity("Enemy", Sprite(Vec(75, 75), (230, 60, 50), image_name = "enemy.png"), 500, Stats(0.48, 100, team, 0.75))
 
 def spawn_ally(team = ALLY):
-    return AIEntity("Ally", Sprite(Vec(70, 70), (40, 100, 230)), 300, Stats(0.44, 100, team, 0.75))
+    return AIEntity("Ally", Sprite(Vec(70, 70), (40, 100, 230)), 400, Stats(0.44, 100, team, 0.75))
 
 
 def spawn_bullet(team, Range):
     return Projectile("Bullet", Sprite(Vec(12, 12), (10, 10, 40), True), Range, \
-                      Stats(1.1, 100, team, damage = 25, invincible = True, destroy_on_hit = True, knockback = 0.0))
+                      Stats(1.1, 100, team, damage = 25, invincible = True, destroy_on_hit = True, knockback = 0.0, avoid = True))
 
 def spawn_grenade(team, Range):
     return Projectile("Grenade", Sprite(Vec(16, 16), (25, 25, 75), False), Range, \
-                      Stats(0.65, 100, team, damage = 0, invincible = True, destroy_on_hit = True, post_func = explode))
+                      Stats(0.65, 100, team, damage = 0, invincible = True, destroy_on_hit = True, post_func = explode, avoid = True))
 
 def spawn_fragment(team, Range):
-    return Projectile("Fragment", Sprite(Vec(30, 30), (240, 160, 50), True), Range, \
-                      Stats(0.25, 100, NEUTRAL, damage = 4, invincible = True, destroy_on_hit = False, knockback = 0.0))
+     return Projectile("Fragment", Sprite(Vec(30, 30), (240, 160, 50), True), Range, \
+                      Stats(0.25, 100, NEUTRAL, damage = 4, invincible = True, destroy_on_hit = False, knockback = 0.0, avoid = True))
 
 def explode(entity, team):
     for i in range(6):
