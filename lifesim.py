@@ -13,11 +13,19 @@ FPS = 60
 RES_PATH = 'res/'
 
 # Teams (who follows and can damage who)
-ALLY = 0            # Follows and damages ENEMY, avoids ALLY (to space out)
-ENEMY = 1           # Follows and damages ALLY, avoids ENEMY
+ALLY = 0            # Follows and damages ENEMY
+ENEMY = 1           # Follows and damages ALLY
 NEUTRAL = 2         # Follows BOTH (if has AI) and damages BOTH
 
 show_hitboxes = False
+
+SIZE = Vec(0, 0)
+SCREEN = None
+
+main_font = "StayPuft.ttf"
+fonts = {}
+
+images = {}
 
 
 def clamp(value, min_val, max_val):
@@ -38,8 +46,24 @@ def dist(self, v):
     return math.hypot(self.x - v.x, self.x - v.x)
 
 
-main_font = "StayPuft.ttf"
-fonts = {}
+
+def set_screen_size(size):
+    global SIZE, SCREEN
+    SIZE = Vec(size[0], size[1])
+    flags = pygame.RESIZABLE
+    SCREEN = pygame.display.set_mode((SIZE.x, SIZE.y), flags)
+
+def screen_pos(v):
+    return v + SIZE/2 - player.pos
+    
+def world_pos(v):
+    return v - SIZE/2 + player.pos
+
+def rect_center(pos, size):
+    rect = pygame.Rect(0, 0, size.x, size.y)
+    rect.center = (pos.x, pos.y)
+    return rect
+
 
 def write(surface, text, font_name, size, pos, color, center=False):
     if size in fonts:
@@ -56,8 +80,6 @@ def write(surface, text, font_name, size, pos, color, center=False):
     surface.blit(text, text_rect)
 
 
-images = {}
-
 def load_image(name):
     # If image has been loaded, use image from dict
     if name in images.keys():
@@ -68,30 +90,6 @@ def load_image(name):
         image = pygame.image.load(path).convert_alpha()
         images[name] = image
     return image
-
-
-def screen_pos(v):
-    return v + SIZE/2 - player.pos
-    
-def world_pos(v):
-    return v - SIZE/2 + player.pos
-
-def rect_center(pos, size):
-    rect = pygame.Rect(0, 0, size.x, size.y)
-    rect.center = (pos.x, pos.y)
-    return rect
-
-
-SIZE = Vec(0, 0)
-SCREEN = None
-
-
-
-def set_screen_size(size):
-    global SIZE, SCREEN
-    SIZE = Vec(size[0], size[1])
-    flags = pygame.RESIZABLE
-    SCREEN = pygame.display.set_mode((SIZE.x, SIZE.y), flags)
 
 
 set_screen_size((1200, 900))
@@ -129,6 +127,7 @@ class World:
     def update(self):
         for e in self.entities:
             if e is not None:
+                e.pre_update()
                 e.update()
         for e1 in self.entities:
             if e1 is not None:
@@ -251,6 +250,19 @@ class Stats:
         if self.health <= 0:
             self.destroy()
 
+    def render_health_bar(self):
+        if True:#self.health < self.max_health:# and self.entity is not player:
+            hitbox = self.entity.get_hitbox(True)
+            total_width = self.max_health* 0.5#hitbox.width
+            outline_pos = Vec(hitbox.center[0], hitbox.top - 13)
+            
+            outline_rect = rect_center(outline_pos, Vec(total_width, 10))
+            pygame.draw.rect(SCREEN, (0, 0, 0), outline_rect)
+
+            fill_rect = outline_rect
+            fill_rect.width = total_width * (self.health/ self.max_health)
+            pygame.draw.rect(SCREEN, (200, 200, 200), fill_rect)
+
     def follows(self, s):
         # Entities follow opposing entities
         return (self.team == ALLY and (s.team == ENEMY and not s.avoid)) \
@@ -264,10 +276,13 @@ class Stats:
     
     def avoids(self, s):
         # Avoids own team to space out
-        # Avoid opposing team if specified to avoid
-        return (self.team == ALLY and (s.team == ALLY or (s.team == ENEMY and s.avoid))) \
-            or (self.team == ENEMY and (s.team == ENEMY or (s.team == ALLY and s.avoid)))
-
+        # Avoid opposing teams if specified to avoid
+        ally = s.team == ALLY
+        enemy = s.team == ENEMY
+        neutral = s.team == NEUTRAL
+        return (self.team == ALLY and ((enemy or neutral) and s.avoid)) \
+            or (self.team == ENEMY and ((ally or neutral) and s.avoid))
+            
     def destroy(self):
         #print(self.entity.name + " be ded.")
         if self.post_func is not None:
@@ -289,13 +304,14 @@ class Stats:
 
 
 class Entity:
-    def __init__(self, name, sprite, stats = Stats(0, 1, NEUTRAL, invincible = True), size = None, solid = False):
+    def __init__(self, name, sprite, stats = Stats(0, 1, NEUTRAL, invincible = True), size = None, solid = False, deaccel = 1):
         self.name = name
         self.world = None
         self.pos = Vec(0, 0)
         self.sprite = sprite
         self.stats = stats
         self.stats.entity = self
+        self.deaccel = deaccel
 
         if size is None:
             self.size = Vec(self.sprite.size)
@@ -309,8 +325,15 @@ class Entity:
         self.sprite.render_at(screen_pos(self.pos))
         if show_hitboxes:
             pygame.draw.rect(SCREEN, (255, 0, 0), self.get_hitbox(True))
+        self.stats.render_health_bar()
+            
+    def pre_update(self):
+        self.vel *= self.deaccel # Slow down in case not accelerating
         
     def update(self):
+        if self.vel.get_mag() > self.stats.speed:
+            self.vel = self.vel.get_norm() * self.stats.speed
+            
         self.pos += self.vel * delta_time
         #if abs(self.vel.x) < 0.01:
         #    self.vel.x = 0
@@ -319,6 +342,9 @@ class Entity:
         
         self.pos = self.world.clamp_pos(self.pos, self.size)
         self.stats.update()
+    
+    def accel(self, direction, magnitude): # positive magnitude is towards target, negative is away
+        self.vel += direction.get_norm() * magnitude
 
     def colliding(self, e):
         return self.get_hitbox().colliderect(e.get_hitbox())
@@ -357,45 +383,81 @@ class Entity:
 
 class Player(Entity):
     def __init__(self, sprite, stats):
-        super().__init__("Player", sprite, stats)
+        super().__init__("Player", sprite, stats, deaccel = 0.85)
         self.dead = False
         #self.inventory = inventory
+        
+    def control(self):
+        #if not self.dead:
+        horizontal = False
+        vertical = False
+        direction = Vec(0, 0)
+        if LEFT:
+            direction -= Vec(1, 0)
+            horizontal = True
+        if RIGHT:
+            direction += Vec(1, 0)
+            horizontal = True
+        if UP:
+            direction -= Vec(0, 1)
+            vertical = True
+        if DOWN:
+            direction += Vec(0, 1)
+            vertical = True
+        self.accel(direction, 0.15)
 
 
 class AIEntity(Entity):
-    def __init__(self, name, sprite, sight_range, stats):
-        super().__init__(name, sprite, stats)
+    def __init__(self, name, sprite, sight_range, stats, follow_weight, avoid_weight):
+        super().__init__(name, sprite, stats, deaccel = 0.85)
         self.sight_range = sight_range
+        self.follow_weight = follow_weight # Force propelling entity towards followed object
+        self.avoid_weight = avoid_weight # Force propelling entity away from avoided object
 
-    def accel(self, target_pos, magnitude): # positive magnitude is towards target, negative is away
-        self.vel += (target_pos - self.pos).get_norm() * magnitude
-
+        self.wandering = True
+        self.wander_angle = random.randint(0, 360)
+    
     def can_follow(self, e):
         return dist(self.pos, e.pos) < self.sight_range and self.stats.follows(e.stats)
    
     def can_avoid(self, e):
         return dist(self.pos, e.pos) < self.sight_range and self.stats.avoids(e.stats)
+
+    def can_spread(self, e): #  Spread away from same team to prevent overlap
+        return self.stats.team == e.stats.team and self.colliding(e)
         
     def update(self):
         follow = list(filter(self.can_follow, self.world.entities))
         avoid = list(filter(self.can_avoid, self.world.entities))
+        spread = list(filter(self.can_spread, self.world.entities))
 
+        # If there is nothing to follow or avoid
         if len(follow) == 0 and len(avoid) == 0:
-            self.vel *= 0.98 # Slow down when not following or avoiding anything
-            if random.randint(0, 1000) < 5: # Randomly change direction, resetting speed
-                self.vel.set_polar(self.stats.speed*0.5, random.randint(0, 360))
+            # Curve angle of path slightly
+            if self.wandering:
+                self.vel.set_polar(self.stats.speed*0.5, self.wander_angle)
+                self.wander_angle += random.randint(-5, 5)
+
+                # Slightly gravitate towards center of world
+                center_dist = Vec(0, 0) - self.pos
+                self.accel(center_dist, math.sqrt(center_dist.get_mag()) * 0.005)
+                
+            if random.randint(0, 1000) < 5: # Randomly change direction and/or stop
+                self.wander_angle = random.randint(0, 360)
+                self.wandering = not self.wandering
         else:
+            self.wandering = False
             # Accel towards follow entities and away from avoid entities
             for e in follow:
-                d = dist(self.pos, e.pos)
-                self.accel(e.pos, 0.05)
+                # Vector towards: desired position - actual position
+                #d = dist(self.pos, e.pos)
+                if not self.colliding(e):
+                    self.accel(e.pos - self.pos, self.follow_weight)
             for e in avoid:
-                d = dist(self.pos, e.pos)
-                self.accel(e.pos, -0.005)
-        # Limit speed if over stats.speed
-        if self.vel.get_mag() > self.stats.speed:
-            self.vel = self.vel.get_norm() * self.stats.speed
-            
+                self.accel(self.pos - e.pos, self.avoid_weight)             
+        for e in spread:
+            # Only spread from teammates
+            self.accel(self.pos - e.pos, 0.025)
         super().update()
 
 
@@ -416,7 +478,7 @@ class Projectile(Entity):
         super().update()
         # accumulate the change in position to get total distance
         relative_vel = self.vel - self.init_vel
-        self.distance += abs(relative_vel.get_mag() * delta_time)
+        self.distance += abs(self.vel.get_mag() * delta_time)
         hits_border = False
 
         if self.world.border:
@@ -572,10 +634,12 @@ def spawn_rock():
 
 
 def spawn_enemy(team = ENEMY):
-    return AIEntity("Enemy", Sprite(Vec(75, 75), (230, 60, 50), image_name = "enemy.png"), 500, Stats(0.48, 100, team, 0.75))
+    return AIEntity("Enemy", Sprite(Vec(75, 75), (230, 60, 50), image_name = "enemy.png"), 500, Stats(0.48, 100, team, 0.75), \
+                    follow_weight = 0.07, avoid_weight = 0.01)
 
 def spawn_ally(team = ALLY):
-    return AIEntity("Ally", Sprite(Vec(70, 70), (40, 100, 230)), 400, Stats(0.44, 100, team, 0.75))
+    return AIEntity("Ally", Sprite(Vec(70, 70), (40, 100, 230)), 400, Stats(0.44, 100, team, 0.75), \
+                    follow_weight = 0.075, avoid_weight = 0.03)
 
 
 def spawn_bullet(team, Range):
@@ -584,15 +648,15 @@ def spawn_bullet(team, Range):
 
 def spawn_grenade(team, Range):
     return Projectile("Grenade", Sprite(Vec(16, 16), (25, 25, 75), False), Range, \
-                      Stats(0.65, 100, team, damage = 0, invincible = True, destroy_on_hit = True, post_func = explode, avoid = True))
+                      Stats(0.75, 100, team, damage = 0, invincible = True, destroy_on_hit = True, post_func = explode, avoid = True))
 
 def spawn_fragment(team, Range):
-     return Projectile("Fragment", Sprite(Vec(30, 30), (240, 160, 50), True), Range, \
-                      Stats(0.25, 100, NEUTRAL, damage = 4, invincible = True, destroy_on_hit = False, knockback = 0.0, avoid = True))
+     return Projectile("Fragment", Sprite(Vec(35, 35), (240, 160, 50), True), Range, \
+                      Stats(0.15, 100, NEUTRAL, damage = 4, invincible = True, destroy_on_hit = False, knockback = 0.0, avoid = True))
 
 def explode(entity, team):
-    for i in range(6):
-        angle = i * 60
+    for i in range(3):
+        angle = i * 120
         fragment = spawn_fragment(team, 100)
         fragment.vel.set_polar(fragment.stats.speed, angle)
         player.world.add(entity.pos, fragment)
@@ -652,7 +716,7 @@ while True:
 
         single_gun = WeaponItem("Single gun", spawn_bullet, 600)
         triple_gun = WeaponItem("Triple gun", spawn_bullet, 450, repeat = 3, interval = 100)
-        shotgun = WeaponItem("Shotgun", spawn_bullet, 300, count = 4, spread = 40)
+        shotgun = WeaponItem("Shotgun", spawn_bullet, 300, count = 4, spread = 35)
         grenade = WeaponItem("Grenade", spawn_grenade, 350)
         ally_summoner = SummonerItem("Spawn Ally", spawn_ally)
         
@@ -731,41 +795,10 @@ while True:
 
             if KEYS[pygame.K_r]:
                 break
-
-            if not player.dead:
-                horizontal = False
-                vertical = False
-                vel = Vec(0, 0)
-                if LEFT:
-                    vel -= Vec(1, 0)
-                    horizontal = True
-                if RIGHT:
-                    vel += Vec(1, 0)
-                    horizontal = True
-                if UP:
-                    vel -= Vec(0, 1)
-                    vertical = True
-                if DOWN:
-                    vel += Vec(0, 1)
-                    vertical = True
-                    
-                # get_normalize and set magnitude so moving diagonal is not faster
-                vel = vel.get_norm() * player.stats.speed
-                slide = 0.8
-                # Control whether each component moves or slides
-                if horizontal:
-                    player.vel.x = vel.x
-                else:
-                    player.vel.x *= slide # slide to a standstill
-                if vertical:
-                    player.vel.y = vel.y
-                else:
-                    player.vel.y *= slide
-            else:
-                player.vel = Vec(0, 0)
-
+            
             inventory.update(MOUSE_CLICKED[0], MOUSE_SCROLL)
-
+            player.control()
+                             
             player.world.update()
             player.world.render()
             
