@@ -1,4 +1,3 @@
-#!/usr/bin/python
 import sys
 import os
 import pygame
@@ -122,6 +121,7 @@ class World:
         self.color_bg = color_bg
         self.entities = []
         self.spawners = []
+        
         self.border = True
 
     def update(self):
@@ -137,30 +137,33 @@ class World:
         for s in self.spawners:
             s.update()
 
-    def render(self):
-        SCREEN.fill(self.color_bg)
-        pygame.draw.rect(SCREEN, self.color_fg, rect_center(screen_pos(Vec(0, 0)), self.size))
+    def render(self, surface):
+        surface.fill(self.color_bg)
+        pygame.draw.rect(surface, self.color_fg, rect_center(screen_pos(Vec(0, 0)), self.size))
 
         self.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
         
         for e in self.entities:
-            e.render()
+            e.render(surface)
             
     def add(self, pos, e):
-        e.pos = pos
+        if e.world is not None:
+            e.world.remove(e)
+        e.pos = Vec(pos)
         e.world = self
         self.entities.append(e)
 
     def remove(self, e):
         if e in self.entities:
             self.entities.remove(e)
+
             if e.world is self:
                 e.world = None
             for s in self.spawners:
                 for spawn in s.spawned:
                     if spawn == e:
                         s.spawned.remove(e)
-        del e
+        #del e
 
     def create_spawner(self, spawner):
         self.spawners.append(spawner)
@@ -215,7 +218,7 @@ class Sprite:
                     self.image = pygame.transform.flip(self.image, True, False)
         self.offset = offset
     
-    def render_at(self, pos):
+    def render_at(self, surface, pos):
         # Only draw shape if color is specified
         rect = rect_center(pos, self.size)
         if self.color is not None:
@@ -223,11 +226,11 @@ class Sprite:
                 shape = pygame.draw.ellipse
             else:
                 shape = pygame.draw.rect
-            shape(SCREEN, self.color, rect)
+            shape(surface, self.color, rect)
             
         if self.image is not None: # Image may be overlayed on shape
             img_surf = pygame.transform.scale(self.image, (int(self.size.x), int(self.size.y)))
-            SCREEN.blit(img_surf, rect)
+            surface.blit(img_surf, rect)
 
 
 class Stats:
@@ -253,15 +256,15 @@ class Stats:
         if self.health <= 0:
             self.destroy()
 
-    def render_health_bar(self):
+    def render_health_bar(self, surface):
         if not self.invincible:#self.health < self.max_health:# and self.entity is not player:
             hitbox = self.entity.get_hitbox(True)
             total_width = math.sqrt(self.max_health) * 4#hitbox.width
             outline_pos = Vec(hitbox.center[0], hitbox.top - 13)
             
             outline_rect = rect_center(outline_pos, Vec(total_width, 8))
-            pygame.draw.rect(SCREEN, (255, 255, 255), outline_rect.inflate(4, 4))
-            pygame.draw.rect(SCREEN, (0, 0, 0), outline_rect)
+            pygame.draw.rect(surface, (255, 255, 255), outline_rect.inflate(4, 4))
+            pygame.draw.rect(surface, (0, 0, 0), outline_rect)
 
             fill_rect = outline_rect
             fill_rect.width = total_width * (self.health/ self.max_health)
@@ -269,7 +272,7 @@ class Stats:
                 fill_color = (25, 150, 255)
             else:
                 fill_color = (255, 0, 0)
-            pygame.draw.rect(SCREEN, fill_color, fill_rect)
+            pygame.draw.rect(surface, fill_color, fill_rect)
 
     def follows(self, s):
         # Entities follow opposing entities
@@ -293,12 +296,14 @@ class Stats:
         #print(self.entity.name + " be ded.")
         if self.post_func is not None:
             self.post_func(self.entity, self.team)
+        
         if self.entity is player:
             player.dead = True
         else:
             if self.entity is not None:
                 if self.entity.world is not None:
                     self.entity.world.remove(self.entity)
+                    #print(str(self.entity) + " be ded 4 realzies.")
     
     def attack(self, e):
         if self.damages(e.stats):
@@ -311,12 +316,17 @@ class Stats:
 
 
 class Entity:
-    def __init__(self, name, sprite, stats = Stats(0, 1, NEUTRAL, invincible = True), size = None, solid = False):
+    def __init__(self, name, sprite, stats = None, size = None, solid = False):
         self.name = name
         self.world = None
         self.pos = Vec(0, 0)
         self.sprite = sprite
-        self.stats = stats
+
+        if stats is None:
+            self.stats = Stats(0, 1, NEUTRAL, invincible = True)
+        else:
+            self.stats = stats
+
         self.stats.entity = self
 
         if size is None:
@@ -327,11 +337,11 @@ class Entity:
         self.solid = solid
         self.vel = Vec(0, 0)
 
-    def render(self):
-        self.sprite.render_at(screen_pos(self.pos))
+    def render(self, surface):
+        self.sprite.render_at(surface, screen_pos(self.pos))
         if show_hitboxes:
-            pygame.draw.rect(SCREEN, (255, 255, 255), self.get_hitbox(True))
-        self.stats.render_health_bar()
+            pygame.draw.rect(surface, (255, 255, 255), self.get_hitbox(True))
+        self.stats.render_health_bar(surface)
         
     def update(self):
         if self.vel.get_mag() > self.stats.speed:
@@ -357,7 +367,7 @@ class Entity:
         
         if self.solid and not e.solid: # Stop entities passing through vertically
             if e.stats.destroy_on_hit:
-                e.stats.destroy()
+               e.stats.destroy()
                 
             thickness = 25
             bottom = self.pos.y + self.size.y/2
@@ -375,7 +385,6 @@ class Entity:
         return rect_center(pos, self.size)
 
     def set_world(self, world):
-        self.world.remove(self)
         world.add(Vec(0, 0), self)
 
     def __str__(self):
@@ -504,10 +513,28 @@ class Projectile(Entity):
         self.lifetime += 1
 
 
+class Pickup(Entity):
+    def __init__(self, name, sprite, func):
+        super().__init__(name, sprite)
+        self.func = func
+        
+    def render(self, surface):
+        super().render(surface)
+        write(surface, self.name, main_font, 13, screen_pos(self.pos), (255, 255, 255), True)
+        
+    def collide(self, e):
+        super().collide(e)
+        if e is player:
+            self.func()
+            #self.world.remove(self)
+            self.stats.destroy()
+
+
 class Item():
-    def __init__(self, name):
+    def __init__(self, name, infinite = False):
         self.name = name
         self.in_use = False
+        self.infinite = infinite
         
     def select(self):
         pass
@@ -518,8 +545,8 @@ class Item():
 
 
 class SummonerItem(Item):
-    def __init__(self, name, spawn_func):
-        super().__init__(name)
+    def __init__(self, name, spawn_func, infinite = False):
+        super().__init__(name, infinite)
         self.spawn_func = spawn_func
     
     def select(self):
@@ -534,8 +561,8 @@ class SummonerItem(Item):
 
 
 class WeaponItem(Item):
-    def __init__(self, name, spawn_func, Range, count = 1, repeat = 1, interval = 0, spread = 0):
-        super().__init__(name)
+    def __init__(self, name, spawn_func, Range, count = 1, repeat = 1, interval = 0, spread = 0, infinite = False):
+        super().__init__(name, infinite)
         self.spawn_func = spawn_func
         self.range = Range
         self.count = count                  # number of projectile spawns per shot
@@ -584,27 +611,15 @@ class WeaponItem(Item):
         entity.world.add(entity.pos, bullet)
 
 
-class Pickup(Entity):
-    def __init__(self, name, sprite, func):
-        super().__init__(name, sprite)
-        self.func = func
-
-    def collide(self, e):
-        if e is player:
-            self.func()
-        super().collide()
-
-
-
 class Inventory():
     def __init__(self):
         self.contents = {
+            single_gun: 1,
             triple_gun: 100,
             shotgun: 100,
             grenade: 100,
             ally_summoner: 100
         }
-
         self.index = 0
         self.selected = items[self.index]
         self.selected.select()
@@ -612,20 +627,20 @@ class Inventory():
     def add(self, item, quantity):
         self.contents[item] += quantity
 
-    def has_item():
-        if item in self.inventory.keys():
-            return self.inventory[item] > 0
+    def has_item(self, item):
+        if item in self.contents.keys():
+            return self.contents[item] > 0
         return False
 
-    def remove(self, item):
-        if has_item(item):
+    def consume(self, item):
+        if self.has_item(item) and not self.selected.infinite:
             self.contents[item] -= 1
-    
+
     def update(self, clicked, scroll):
         if scroll != 0:
             self.index += clamp(scroll, -1, 1)
-            
-        self.index = wraparound(self.index, 0, len(inventory.contents))
+        
+        self.index = wraparound(self.index, 0, len(inventory.contents) - 1)
         self.selected = items[self.index]
         
         if self.selected is not None:
@@ -633,7 +648,14 @@ class Inventory():
                 self.selected.select()  
             if clicked:
                 self.selected.click()
+                self.consume(self.selected)
             self.selected.update(player, player.stats.team)
+
+    def get_selected_info(self):
+        quantity = " * " + str(self.contents[self.selected])
+        if self.selected.infinite:
+            quantity = ""
+        return "Item: " + self.selected.name + quantity
     
 
 
@@ -643,16 +665,20 @@ def spawn_rock():
 
 
 def spawn_enemy(team = ENEMY):
-    return AIEntity("Enemy", Sprite(Vec(75, 75), (210, 50, 15), image_name = "enemy.png"), 500, Stats(0.48, 100, team, 0.75, knockback = 0.01), \
-                    follow_weight = 0.06, avoid_weight = 0.03)
+    return AIEntity("Enemy", Sprite(Vec(75, 75), (210, 50, 15), image_name = "enemy.png"), 500, Stats(0.45, 100, team, 0.75, knockback = 0.01), \
+                    follow_weight = 0.06, avoid_weight = 0.02)
 
 def spawn_mini_boss(team = ENEMY):
-    return AIEntity("Mini boss", Sprite(Vec(100, 100), (175, 35, 0), image_name = "enemy.png"), 2000, Stats(0.6, 500, team, 2, knockback = 0.05, mass = 15), \
-                    follow_weight = 0.03, avoid_weight = 0)
+    return AIEntity("Mini boss", Sprite(Vec(100, 100), (175, 35, 0), image_name = "enemy.png"), 1000, Stats(0.6, 500, team, 2, knockback = 0.05, mass = 15, avoid = True), \
+                    follow_weight = 0.028, avoid_weight = 0)
 
 def spawn_ally(team = ALLY):
     return AIEntity("Ally", Sprite(Vec(70, 70), (25, 75, 220)), 400, Stats(0.44, 100, team, 0.75, knockback = 0.01), \
                     follow_weight = 0.075, avoid_weight = 0.03)
+
+def spawn_shotgun_pickup():
+    return Pickup("Shotgun", Sprite(Vec(50, 50), (0, 0, 0)), lambda: inventory.add(shotgun, 10))
+
 
 
 def spawn_bullet(team, Range):
@@ -665,7 +691,10 @@ def spawn_grenade(team, Range):
 
 def spawn_explosion(team, Range):
      return Projectile("Explosion", Sprite(Vec(100, 100), (245, 160, 50), True), Range, \
-                      Stats(0.35, 100, NEUTRAL, damage = 6, invincible = True, destroy_on_hit = False, knockback = 0.15, avoid = True))
+                      Stats(0.35, 100, NEUTRAL, damage = 4, invincible = True, destroy_on_hit = False, knockback = 0.15, avoid = True))
+
+
+
 
 def explode(entity, team):
     init_angle = random.randint(0, 120)
@@ -679,15 +708,20 @@ def explode(entity, team):
 
 def debug(key, mouse_world_pos):
     global show_hitboxes
-    if key == pygame.K_u:
-        player.world.add(mouse_world_pos, spawn_mini_boss())
     if key == pygame.K_j:
         player.world.add(mouse_world_pos, spawn_enemy())
+    if key == pygame.K_u:
+        player.world.add(mouse_world_pos, spawn_mini_boss())
+        
     if key == pygame.K_k:
         player.world.add(mouse_world_pos, spawn_ally())
+    if key == pygame.K_i:
+        player.world.add(mouse_world_pos, spawn_shotgun_pickup())
+        
     if key == pygame.K_h:
         player.dead = False
         player.stats.health += 100
+        
     elif key == pygame.K_b:
         index = worlds.index(player.world) - 1
         index = wraparound(index, 0, len(worlds) - 1)
@@ -702,10 +736,10 @@ def debug(key, mouse_world_pos):
         show_hitboxes = not show_hitboxes
     
 
-def render_overlay():
+def render_overlay(surface):
     stat_texts = [
         "Entities: " + str(len(player.world.entities)),
-        "Item: " + inventory.selected.name,
+        inventory.get_selected_info(),#"Item: " + inventory.selected.name + " * " + str(inventory.contents[inventory.selected]),
         "World: " + player.world.name,
         "Position: " + str(player.pos.get_rounded()),
         "Health: " + str(max(0, round(player.stats.health))),
@@ -713,7 +747,7 @@ def render_overlay():
     y = SIZE.y - 15
     for stat in stat_texts:
         y -= 30
-        write(SCREEN, stat, main_font, 30, Vec(10, y), (255, 255, 255))
+        write(surface, stat, main_font, 30, Vec(10, y), (255, 255, 255))
 
 
 while True:
@@ -731,7 +765,7 @@ while True:
         worlds.append(forest_world)
 
 
-        single_gun = WeaponItem("Single gun", spawn_bullet, 600)
+        single_gun = WeaponItem("Single gun", spawn_bullet, 600, infinite = True)
         triple_gun = WeaponItem("Triple gun", spawn_bullet, 450, repeat = 3, interval = 100)
         shotgun = WeaponItem("Shotgun", spawn_bullet, 300, count = 4, spread = 35)
         grenade = WeaponItem("Grenade", spawn_grenade, 350)
@@ -770,7 +804,7 @@ while True:
             forest_world.add(forest_world.rand_pos(), spawn_rock())
 
         overworld.create_spawner(Spawner(2000, spawn_enemy, 3))
-        city_world.create_spawner(Spawner(1500, spawn_enemy, 4))
+        #city_world.create_spawner(Spawner(1500, spawn_enemy, 4))
         cave_world.create_spawner(Spawner(1000, spawn_enemy, 5))
         
         forest_world.create_spawner(Spawner(5000, spawn_mini_boss, 1))
@@ -819,9 +853,10 @@ while True:
             player.control()
                              
             player.world.update()
-            player.world.render()
+            print(worlds.index(player.world))
+            player.world.render(SCREEN)
             
-            render_overlay()
+            render_overlay(SCREEN)
             draw_cursor(SCREEN)
 
             pygame.display.flip()
