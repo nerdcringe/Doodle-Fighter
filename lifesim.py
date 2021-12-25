@@ -174,7 +174,7 @@ class World:
                     if spawn == e:
                         s.spawned.remove(e)
             e.last_colliding.clear()
-        del e
+        #del e
 
     def create_spawner(self, spawner):
         self.spawners.append(spawner)
@@ -195,7 +195,7 @@ class World:
         x = self.size.x
         y = self.size.y
         return Vec(random.randint(-x/2, x/2), random.randint(-y/2, y/2))
-    
+
 
 
 class Spawner:
@@ -211,7 +211,7 @@ class Spawner:
         self.time += delta_time
         if self.time > self.interval and len(self.spawned) < self.max_num:
             self.time = 0
-            entity = self.spawn_func()
+            entity = self.spawn_func(self)
             self.spawned.append(entity)
             self.world.add(self.world.rand_pos(), entity)
 
@@ -259,13 +259,15 @@ class Stats:
         
         self.knockback = knockback
         self.mass = mass
-        
         self.avoid = avoid # Whether opposing team will avoid entity
+        self.destroyed = False
 
     def update(self):
         self.health = max(0, self.health)
         if self.health <= 0:
             self.destroy()
+        else:
+            self.destroyed = False
 
     def is_alive(self):
         return self.health > 0
@@ -297,7 +299,7 @@ class Stats:
         # Entities damage enemy, neutral damages all
         return (self.team == ALLY and s.team == ENEMY) \
             or (self.team == ENEMY and s.team == ALLY) \
-            or self.team == NEUTRAL
+            or self.team == NEUTRAL or s.team == NEUTRAL
     
     def avoids(self, s):
         # Avoids own team to space out
@@ -307,20 +309,31 @@ class Stats:
             or (self.team == ENEMY and ((s.team == ALLY or neutral) and s.avoid))
             
     def destroy(self):
-        self.health = 0
         #print(self.entity.name + " be ded.")
-        if self.post_func is not None:
-            self.post_func(self.entity, self.team)
+        """in_world = True
+        if self.entity.world is None:
+            in_world = False
+        else:
+            in_world = self.entity in self.entity.world.entities
         
-        if self.entity is not player and self.entity is not None:
-            if self.entity.world is not None:
-                self.entity.world.remove(self.entity)
-                #print(str(self.entity) + " be ded 4 realzies.")
+        if in_world:"""
+        if not self.destroyed:
+            self.destroyed = True
+            self.health = 0
+            if self.post_func is not None:
+                self.post_func(self.entity, self.team)
+            
+            if self.entity is not player and self.entity is not None:
+                if self.entity.world is not None:
+                    self.entity.world.remove(self.entity)
+                    #print(str(self.entity) + " be ded 4 realzies.")
     
     def attack(self, e):
         if self.damages(e.stats):
             if not e.stats.invincible:
                 e.stats.health -= self.damage
+            if not e.stats.is_alive():
+                shake_screen(self.entity.shake_time)
             # Accelerate with knockback force / mass
             e.accel((e.pos - self.entity.pos).get_norm() * (self.knockback/e.stats.mass))
             if self.destroy_on_hit:
@@ -328,7 +341,7 @@ class Stats:
 
 
 class Entity:
-    def __init__(self, name, sprite, stats = None, size = None, solid = False, shake_time = 0):
+    def __init__(self, name, sprite, stats = None, size = None, solid = False, collide_func = None, shake_time = 0):
         self.name = name
         self.world = None
         self.pos = Vec(0, 0)
@@ -348,6 +361,7 @@ class Entity:
         self.solid = solid
         self.vel = Vec(0, 0)
         self.shake_time = shake_time
+        self.collide_func = collide_func
         self.last_colliding = []
 
     def render(self, surface):
@@ -376,13 +390,15 @@ class Entity:
         return self.get_hitbox().colliderect(e.get_hitbox())
         
     def collide(self, e):
+        if self.collide_func is not None:
+            self.collide_func(self, e)
         self.stats.attack(e)
         if self.solid and not e.solid: # Stop entities passing through vertically
-            if e.stats.destroy_on_hit:
-               e.stats.destroy()
+            #if e.stats.destroy_on_hit:
+               #e.stats.destroy()
             #e.vel.y = -e.vel.y
             
-            thickness = 25
+            thickness = 10
             bottom = self.pos.y + self.size.y/2
             e_bottom = e.pos.y + e.size.y/2
             if e_bottom < bottom:
@@ -412,6 +428,7 @@ class Player(Entity):
     def __init__(self, sprite, stats):
         super().__init__("Player", sprite, stats)
         #self.inventory = inventory
+        self.wealth = 0
 
     def update(self):
         super().update()
@@ -442,9 +459,12 @@ class Player(Entity):
             if not (horizontal or vertical): 
                 self.vel *= 0.85
 
+    def gain_wealth(self, amount):
+        self.wealth += amount
+
 
 class AIEntity(Entity):
-    def __init__(self, name, sprite, sight_range, stats, follow_weight, avoid_weight, shake_time = 0):
+    def __init__(self, name, sprite, sight_range, stats, follow_weight, avoid_weight = 0, shake_time = 0):
         super().__init__(name, sprite, stats, shake_time = shake_time)
         self.sight_range = sight_range
         self.follow_weight = follow_weight # Force propelling entity towards followed object
@@ -515,9 +535,9 @@ class Projectile(Entity):
         self.vel += init_vel
 
     def collide(self, e):
-        if self.stats.damages(e.stats):
-            shake_screen(self.shake_time)
         super().collide(e)
+        #if self.stats.damages(e.stats):
+            #shake_screen(self.shake_time)
         
     def update(self):
         super().update()
@@ -541,8 +561,8 @@ class Projectile(Entity):
 
 
 class Pickup(Entity):
-    def __init__(self, name, sprite, func):
-        super().__init__(name, sprite)
+    def __init__(self, name, sprite, func, size = None):
+        super().__init__(name, sprite, size = size)
         self.func = func
         
     def render(self, surface):
@@ -580,7 +600,7 @@ class SummonerItem(Item):
         current_cursor = CURSOR_PLACE
         
     def click(self):
-        player.world.add(world_pos(MOUSE_POS), self.spawn_func())
+        player.world.add(world_pos(MOUSE_POS), self.spawn_func(self))
     
     def update(self, entity, team):
         pass
@@ -689,56 +709,70 @@ def spawn_rock():
     return Entity("Rock", Sprite(Vec(100, 60), image_name = "rock.png", flip = True), \
             size = Vec(80, 40), solid = True)
 
+def spawn_copper(entity = None):
+    sprite = Sprite(Vec(100, 60), image_name = "pickup_copper.png", flip = True)
+    stats = Stats(0, 200, NEUTRAL, 0, post_func = lambda self, other: player.gain_wealth(10))
+    return Entity("Copper", sprite, stats, size = Vec(80, 40), solid = True)
+
+def spawn_gold(entity = None):
+    sprite = Sprite(Vec(100, 60), image_name = "pickup_gold.png", flip = True)
+    stats = Stats(0, 400, NEUTRAL, 0, post_func = lambda self, other: player.gain_wealth(10))
+    return Entity("Gold", sprite, stats, size = Vec(80, 40), solid = True)
+
 def spawn_tree():
-    return Entity("Tree", Sprite(Vec(175, 175), image_name = "tree.png", flip = True), \
-           size = Vec(50, 175), solid = True)
+    sprite = Sprite(Vec(175, 175), image_name = "tree.png", flip = True)
+    return Entity("Tree", sprite, size = Vec(50, 175), solid = True)
+
 def spawn_winter_tree():
-    return Entity("Winter Tree", Sprite(Vec(150, 300), image_name = "tree_winter.png", flip = True), \
-                size = Vec(30, 300), solid = True)
+    sprite = Sprite(Vec(150, 300), image_name = "tree_winter.png", flip = True)
+    return Entity("Winter Tree", sprite, size = Vec(30, 300), solid = True)
 
 
-def spawn_enemy(team = ENEMY):
-    return AIEntity("Enemy", Sprite(Vec(75, 75), (210, 50, 15), image_name = "enemy.png"), 500, \
-                    Stats(0.45, 100, team, 0.75, knockback = 0.01, post_func = drop_loot), \
-                    follow_weight = 0.06, avoid_weight = 0.02)
+def spawn_enemy(entity = None, team = ENEMY):
+    sprite = Sprite(Vec(75, 75), (210, 50, 15), image_name = "enemy.png")
+    stats = Stats(0.45, 100, team, 0.75, knockback = 0.01, post_func = drop_loot)
+    return AIEntity("Enemy", sprite, 500, stats, follow_weight = 0.06, avoid_weight = 0.05)
 
-def spawn_mini_boss(team = ENEMY):
-    return AIEntity("Mini boss", Sprite(Vec(100, 100), (150, 25, 5), image_name = "enemy.png"), 1500, \
-                    Stats(0.575, 500, team, 2, knockback = 0.05, mass = 15, avoid = True), \
-                    follow_weight = 0.0285, avoid_weight = 0, shake_time = 200)
+def spawn_mini_boss(entity = None, team = ENEMY):
+    sprite = Sprite(Vec(100, 100), (150, 25, 5), image_name = "enemy.png")
+    stats = Stats(0.575, 500, team, 2, knockback = 0.05, mass = 15, avoid = True)
+    return AIEntity("Mini boss", sprite, 1500, stats = stats, follow_weight = 0.0285, shake_time = 200)
 
 def spawn_ally(team = ALLY):
-    return AIEntity("Ally", Sprite(Vec(70, 70), (25, 75, 220)), 400, Stats(0.44, 100, team, 0.75, knockback = 0.01), \
-                    follow_weight = 0.075, avoid_weight = 0.025)
+    sprite = Sprite(Vec(70, 70), (25, 75, 220))
+    stats = Stats(0.44, 100, team, 0.75, knockback = 0.01)
+    return AIEntity("Ally", sprite, 400, stats, follow_weight = 0.075, avoid_weight = 0.01)
 
 
 def spawn_bullet(team, Range):
-    return Projectile("Bullet", Sprite(Vec(12, 12), (10, 10, 40), True), Range, \
-                      Stats(1.1, 100, team, damage = 25, invincible = True,
-                            destroy_on_hit = True, knockback = 1, avoid = True), shake_time = 125)
+    sprite = Sprite(Vec(12, 12), (10, 10, 40), True)
+    stats = Stats(1.1, 100, team, damage = 25, invincible = True, destroy_on_hit = True, knockback = 1)
+    return Projectile("Bullet", sprite, Range, stats, shake_time = 125)
 
 def spawn_grenade(team, Range):
-    return Projectile("Grenade", Sprite(Vec(16, 24), (10, 50, 20), True), Range, \
-                      Stats(0.75, 100, team, damage = 0, invincible = True, destroy_on_hit = True, post_func = explode, avoid = True))
+    sprite = Sprite(Vec(16, 24), (10, 50, 20), True)
+    stats = Stats(0.75, 100, team, damage = 0, invincible = True, destroy_on_hit = True, post_func = explode)
+    return Projectile("Grenade", sprite, Range, stats)
 
 def spawn_explosion(team, Range):
-     return Projectile("Explosion", Sprite(Vec(100, 100), (245, 160, 50), True), Range, \
-                      Stats(0.35, 100, NEUTRAL, damage = 5, invincible = True, destroy_on_hit = False, knockback = 0.2, avoid = True), \
-                      shake_time = 200)
+    sprite = Sprite(Vec(100, 100), (245, 160, 50), True)
+    stats = Stats(0.35, 100, NEUTRAL, damage = 5, invincible = True, destroy_on_hit = False, knockback = 0.2)
+    return Projectile("Explosion", sprite, Range, stats,shake_time = 200)
 
-def shake_screen(time):
-    global screen_shake
-    screen_shake = time
 
 def explode(entity, team):
     init_angle = random.randint(0, 120)
-    #shake_screen(250)
     for i in range(3):
         angle = (i * 120) + init_angle
         fragment = spawn_explosion(team, 150)
         fragment.shoot(angle)#, entity.vel)
         player.world.add(entity.pos, fragment)
 
+
+"""def collect(entity, other):
+    if other is player:
+        entity.stats.destroy()"""
+        
 
 def spawn_shotgun_pickup():
     return Pickup("Shotgun", Sprite(Vec(60, 60), (0, 0, 0)), lambda: inventory.add(shotgun, 3))
@@ -757,6 +791,10 @@ def drop_loot(entity, team):
         player.world.add(entity.pos, spawn_shotgun_pickup())
     
 
+def shake_screen(time):
+    global screen_shake
+    screen_shake = time
+    
 
 def debug(key, mouse_world_pos):
     if key == pygame.K_j:
@@ -798,6 +836,7 @@ def render_overlay(surface):
         "Entities: " + str(len(player.world.entities)),
         inventory.get_selected_info(),
         "World: " + player.world.name,
+        "Wealth: " + str(player.wealth),
         "Position: " + str(player.pos.get_rounded()),
         "Health: " + str(max(0, round(player.stats.health))),
     ]
@@ -861,9 +900,12 @@ while True:
 
         overworld.create_spawner(Spawner(2000, spawn_enemy, 3))
         #city_world.create_spawner(Spawner(1500, spawn_enemy, 4))
-        cave_world.create_spawner(Spawner(1000, spawn_enemy, 5))
+        #cave_world.create_spawner(Spawner(1000, spawn_enemy, 5))
+        cave_world.create_spawner(Spawner(1000, spawn_copper, 3))
+        cave_world.create_spawner(Spawner(1000, spawn_gold, 5))
         
         forest_world.create_spawner(Spawner(5000, spawn_mini_boss, 1))
+
 
         
         while True:
