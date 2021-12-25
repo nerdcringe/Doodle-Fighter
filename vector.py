@@ -67,3 +67,6 @@ class Vec:
             return Vec(0, 0)
         return Vec(self.x / mag, self.y / mag)
     
+
+    def dist(self, v):
+        return math.hypot(self.x - v.x, self.x - v.x)

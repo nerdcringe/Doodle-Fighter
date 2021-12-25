@@ -43,9 +43,6 @@ def wraparound(value, min_val, max_val):
 def round_to(n, base):
     return base * round(float(n)/base)
 
-def dist(self, v):
-    return math.hypot(self.x - v.x, self.x - v.x)
-
 
 def set_screen_size(size):
     global SIZE, SCREEN, GAME_SURFACE, OVERLAY_SURFACE
@@ -54,7 +51,6 @@ def set_screen_size(size):
     SCREEN = pygame.display.set_mode(size, flags)
     GAME_SURFACE = pygame.Surface(size)
     OVERLAY_SURFACE = pygame.Surface(size, pygame.SRCALPHA, 32)
-    #OVERLAY_SURFACE.set_colorkey((0, 0, 0))
     
 
 set_screen_size((1200, 900))
@@ -141,7 +137,7 @@ class World:
         for e1 in self.entities:
             if e1 is not None:
                 for e2 in self.entities:
-                    if e2 is not None:
+                    if e2 is not None and e1 != e2:
                         if e1.colliding(e2):
                             e1.collide(e2)
         for s in self.spawners:
@@ -173,7 +169,6 @@ class World:
                 for spawn in s.spawned:
                     if spawn == e:
                         s.spawned.remove(e)
-            e.last_colliding.clear()
         #del e
 
     def create_spawner(self, spawner):
@@ -245,7 +240,7 @@ class Sprite:
 
 
 class Stats:
-    def __init__(self, speed, max_health, team, damage = 0, invincible = False, destroy_on_hit = False, post_func = None, knockback = 0, mass = 1, avoid = False):
+    def __init__(self, speed, max_health, team, damage = 0, invincible = False, post_func = None, destroy_on_hit = False, knockback = 0, mass = 1):
         self.entity = None
         self.speed = speed
         self.max_health = max_health
@@ -254,12 +249,11 @@ class Stats:
         self.damage = damage
         self.team = team
         
-        self.destroy_on_hit = destroy_on_hit
         self.post_func = post_func
+        self.destroy_on_hit = destroy_on_hit
         
         self.knockback = knockback
         self.mass = mass
-        self.avoid = avoid # Whether opposing team will avoid entity
         self.destroyed = False
 
     def update(self):
@@ -292,8 +286,8 @@ class Stats:
 
     def follows(self, s):
         # Entities follow opposing entities
-        return (self.team == ALLY and (s.team == ENEMY and not s.avoid)) \
-            or (self.team == ENEMY and (s.team == ALLY and not s.avoid))
+        return (self.team == ALLY and s.team == ENEMY) \
+            or (self.team == ENEMY and s.team == ALLY)
     
     def damages(self, s):
         # Entities damage enemy, neutral damages all
@@ -301,22 +295,18 @@ class Stats:
             or (self.team == ENEMY and s.team == ALLY) \
             or self.team == NEUTRAL or s.team == NEUTRAL
     
-    def avoids(self, s):
-        # Avoids own team to space out
-        # Avoid opposing teams if specified to avoid
-        neutral = s.team == NEUTRAL
-        return (self.team == ALLY and ((s.team == ENEMY or neutral) and s.avoid)) \
-            or (self.team == ENEMY and ((s.team == ALLY or neutral) and s.avoid))
+    def attack(self, s):
+        if self.damages(s):
+            if not s.invincible:
+                s.health -= self.damage
+                if s.health <= 0:
+                    shake_screen()
+            # Accelerate with knockback force / mass
+            s.entity.accel((s.entity.pos - self.entity.pos).get_norm() * (self.knockback/s.mass))
+            if self.destroy_on_hit:
+                self.destroy()
             
     def destroy(self):
-        #print(self.entity.name + " be ded.")
-        """in_world = True
-        if self.entity.world is None:
-            in_world = False
-        else:
-            in_world = self.entity in self.entity.world.entities
-        
-        if in_world:"""
         if not self.destroyed:
             self.destroyed = True
             self.health = 0
@@ -327,24 +317,14 @@ class Stats:
                 if self.entity.world is not None:
                     self.entity.world.remove(self.entity)
                     #print(str(self.entity) + " be ded 4 realzies.")
-    
-    def attack(self, e):
-        if self.damages(e.stats):
-            if not e.stats.invincible:
-                e.stats.health -= self.damage
-            if not e.stats.is_alive():
-                shake_screen(self.entity.shake_time)
-            # Accelerate with knockback force / mass
-            e.accel((e.pos - self.entity.pos).get_norm() * (self.knockback/e.stats.mass))
-            if self.destroy_on_hit:
-                self.destroy()
 
 
 class Entity:
-    def __init__(self, name, sprite, stats = None, size = None, solid = False, collide_func = None, shake_time = 0):
+    def __init__(self, name, sprite, stats = None, size = None, solid = False): #, shake_time = 0):
         self.name = name
         self.world = None
         self.pos = Vec(0, 0)
+        self.vel = Vec(0, 0)
         self.sprite = sprite
 
         if stats is None:
@@ -357,12 +337,9 @@ class Entity:
             self.size = Vec(self.sprite.size)
         else:
             self.size = size
-            
+        
         self.solid = solid
-        self.vel = Vec(0, 0)
-        self.shake_time = shake_time
-        self.collide_func = collide_func
-        self.last_colliding = []
+        #self.shake_time = shake_time # How long to shake after hitting solid object
 
     def render(self, surface):
         self.sprite.render_at(surface, screen_pos(self.pos))
@@ -373,44 +350,33 @@ class Entity:
     def update(self):
         if self.vel.get_mag() > self.stats.speed:
             self.vel = self.vel.get_norm() * self.stats.speed
-            
         self.pos += self.vel * delta_time
-        #if abs(self.vel.x) < 0.01:
-        #    self.vel.x = 0
-        #if abs(self.vel.y) < 0.01:
-        #    self.vel.y = 0
-        
         self.pos = self.world.clamp_pos(self.pos, self.size)
         self.stats.update()
     
     def accel(self, force): # Add to velocity vector, a = f/m
-        self.vel += force#/self.stats.mass
+        self.vel += force
 
-    def colliding(self, e):
-        return self.get_hitbox().colliderect(e.get_hitbox())
+    def colliding(self, other):
+        return self.get_hitbox().colliderect(other.get_hitbox())
         
-    def collide(self, e):
-        if self.collide_func is not None:
-            self.collide_func(self, e)
-        self.stats.attack(e)
-        if self.solid and not e.solid: # Stop entities passing through vertically
-            #if e.stats.destroy_on_hit:
-               #e.stats.destroy()
-            #e.vel.y = -e.vel.y
-            
+    def collide(self, other):
+        self.stats.attack(other.stats)
+        
+        # Stop entities passing through vertically
+        if self.solid and not other.solid:
+            """if other.shake_time > 0:
+                shake_screen(other.shake_time)
+                print("yooo")
+            """
             thickness = 10
             bottom = self.pos.y + self.size.y/2
-            e_bottom = e.pos.y + e.size.y/2
-            if e_bottom < bottom:
-                e.pos.y = min(e_bottom + thickness, bottom) - e.size.y/2 - thickness
+            other_bottom = other.pos.y + other.size.y/2
+            if other_bottom < bottom:
+                other.pos.y = min(other_bottom + thickness, bottom) - other.size.y/2 - thickness
             else:
-                e.pos.y = max(e_bottom - thickness, bottom) - e.size.y/2 + thickness
+                other.pos.y = max(other_bottom - thickness, bottom) - other.size.y/2 + thickness
 
-            if e.shake_time > 0 and self not in e.last_colliding:
-                global screen_shake
-                screen_shake = e.shake_time
-        e.last_colliding.append(self)
-    
     def get_hitbox(self, screen = False):
         pos = self.pos
         if screen:
@@ -464,30 +430,26 @@ class Player(Entity):
 
 
 class AIEntity(Entity):
-    def __init__(self, name, sprite, sight_range, stats, follow_weight, avoid_weight = 0, shake_time = 0):
-        super().__init__(name, sprite, stats, shake_time = shake_time)
+    def __init__(self, name, sprite, sight_range, stats, follow_weight):#, shake_time = 0):
+        super().__init__(name, sprite, stats)#, shake_time = shake_time)
         self.sight_range = sight_range
         self.follow_weight = follow_weight # Force propelling entity towards followed object
-        self.avoid_weight = avoid_weight # Force propelling entity away from avoided object
 
         self.wandering = True
         self.wander_angle = random.randint(0, 360)
     
     def can_follow(self, e):
-        return dist(self.pos, e.pos) < self.sight_range and self.stats.follows(e.stats) and e.stats.is_alive()
-   
-    def can_avoid(self, e):
-        return dist(self.pos, e.pos) < self.sight_range and self.stats.avoids(e.stats) and e.stats.is_alive()
+        return Vec.dist(self.pos, e.pos) < self.sight_range and self.stats.follows(e.stats) and e.stats.is_alive()
 
     def can_spread(self, e): #  Spread away from same team to prevent overlap
         return self != e and self.stats.team == e.stats.team and e.stats.is_alive()
         
     def update(self):
         follow = list(filter(self.can_follow, self.world.entities))
-        avoid = list(filter(self.can_avoid, self.world.entities))
         spread = list(filter(self.can_spread, self.world.entities))
-        # If there is nothing to follow or avoid
-        if len(follow) == 0 and len(avoid) == 0:
+        
+        # If there is nothing to follow
+        if len(follow) == 0:
             # Curve angle of path slightly
             if self.wandering:
                 self.vel.set_polar(self.stats.speed*0.5, self.wander_angle)
@@ -499,16 +461,13 @@ class AIEntity(Entity):
                 self.wandering = not self.wandering
         else:
             self.wandering = False
-            # Accel towards follow entities and away from avoid entities
             for e in follow:
                 # Vector towards: desired position - actual position
                 if not self.colliding(e):
                     self.accel((e.pos - self.pos).get_norm() * self.follow_weight)
                 else:
                     self.vel *= 0.96
-            for e in avoid:
-                # Vector away: actual position - desired position
-                self.accel((self.pos - e.pos).get_norm() * self.avoid_weight)# * scalar)
+                    
         for e in spread:
             # Only spread away from same team
             pos_diff = self.pos - e.pos
@@ -522,22 +481,21 @@ class AIEntity(Entity):
 
 
 class Projectile(Entity):
-    def __init__(self, name, sprite, Range, stats, shake_time = 0):
-        super().__init__(name, sprite, stats, shake_time = shake_time)
+    def __init__(self, name, sprite, Range, stats):
+        super().__init__(name, sprite, stats)
         self.range = Range
         self.distance = 0
         self.init_vel = Vec(0, 0)
         self.lifetime = 0
+        #self.shake_time = shake_time
+        
+    def collide(self, e):
+        super().collide(e)
 
     def shoot(self, angle, init_vel = Vec(0, 0)):
         self.vel.set_polar(self.stats.speed, angle)
         self.init_vel = init_vel
         self.vel += init_vel
-
-    def collide(self, e):
-        super().collide(e)
-        #if self.stats.damages(e.stats):
-            #shake_screen(self.shake_time)
         
     def update(self):
         super().update()
@@ -711,12 +669,12 @@ def spawn_rock():
 
 def spawn_copper(entity = None):
     sprite = Sprite(Vec(100, 60), image_name = "pickup_copper.png", flip = True)
-    stats = Stats(0, 200, NEUTRAL, 0, post_func = lambda self, other: player.gain_wealth(10))
+    stats = Stats(0, 150, NEUTRAL, 0, post_func = lambda self, other: player.gain_wealth(5))
     return Entity("Copper", sprite, stats, size = Vec(80, 40), solid = True)
 
 def spawn_gold(entity = None):
     sprite = Sprite(Vec(100, 60), image_name = "pickup_gold.png", flip = True)
-    stats = Stats(0, 400, NEUTRAL, 0, post_func = lambda self, other: player.gain_wealth(10))
+    stats = Stats(0, 200, NEUTRAL, 0, post_func = lambda self, other: player.gain_wealth(10))
     return Entity("Gold", sprite, stats, size = Vec(80, 40), solid = True)
 
 def spawn_tree():
@@ -728,26 +686,26 @@ def spawn_winter_tree():
     return Entity("Winter Tree", sprite, size = Vec(30, 300), solid = True)
 
 
-def spawn_enemy(entity = None, team = ENEMY):
+def spawn_enemy(entity = None):
     sprite = Sprite(Vec(75, 75), (210, 50, 15), image_name = "enemy.png")
-    stats = Stats(0.45, 100, team, 0.75, knockback = 0.01, post_func = drop_loot)
-    return AIEntity("Enemy", sprite, 500, stats, follow_weight = 0.06, avoid_weight = 0.05)
+    stats = Stats(0.45, 100, ENEMY, 0.75, knockback = 0.01, post_func = drop_loot)
+    return AIEntity("Enemy", sprite, 500, stats, follow_weight = 0.06)
 
-def spawn_mini_boss(entity = None, team = ENEMY):
+def spawn_mini_boss(entity = None):
     sprite = Sprite(Vec(100, 100), (150, 25, 5), image_name = "enemy.png")
-    stats = Stats(0.575, 500, team, 2, knockback = 0.05, mass = 15, avoid = True)
-    return AIEntity("Mini boss", sprite, 1500, stats = stats, follow_weight = 0.0285, shake_time = 200)
+    stats = Stats(0.575, 400, ENEMY, 1.5, knockback = 0.05, mass = 15)
+    return AIEntity("Mini boss", sprite, 1500, stats = stats, follow_weight = 0.0285)
 
-def spawn_ally(team = ALLY):
+def spawn_ally(entity = None):
     sprite = Sprite(Vec(70, 70), (25, 75, 220))
-    stats = Stats(0.44, 100, team, 0.75, knockback = 0.01)
-    return AIEntity("Ally", sprite, 400, stats, follow_weight = 0.075, avoid_weight = 0.01)
+    stats = Stats(0.44, 100, ALLY, 10.75, knockback = 0.01)
+    return AIEntity("Ally", sprite, 400, stats, follow_weight = 0.075)
 
 
 def spawn_bullet(team, Range):
     sprite = Sprite(Vec(12, 12), (10, 10, 40), True)
     stats = Stats(1.1, 100, team, damage = 25, invincible = True, destroy_on_hit = True, knockback = 1)
-    return Projectile("Bullet", sprite, Range, stats, shake_time = 125)
+    return Projectile("Bullet", sprite, Range, stats)
 
 def spawn_grenade(team, Range):
     sprite = Sprite(Vec(16, 24), (10, 50, 20), True)
@@ -757,22 +715,18 @@ def spawn_grenade(team, Range):
 def spawn_explosion(team, Range):
     sprite = Sprite(Vec(100, 100), (245, 160, 50), True)
     stats = Stats(0.35, 100, NEUTRAL, damage = 5, invincible = True, destroy_on_hit = False, knockback = 0.2)
-    return Projectile("Explosion", sprite, Range, stats,shake_time = 200)
+    return Projectile("Explosion", sprite, Range, stats)
 
 
-def explode(entity, team):
+
+def explode(self, team):
     init_angle = random.randint(0, 120)
     for i in range(3):
         angle = (i * 120) + init_angle
         fragment = spawn_explosion(team, 150)
         fragment.shoot(angle)#, entity.vel)
-        player.world.add(entity.pos, fragment)
+        player.world.add(self.pos, fragment)
 
-
-"""def collect(entity, other):
-    if other is player:
-        entity.stats.destroy()"""
-        
 
 def spawn_shotgun_pickup():
     return Pickup("Shotgun", Sprite(Vec(60, 60), (0, 0, 0)), lambda: inventory.add(shotgun, 3))
@@ -783,15 +737,16 @@ def spawn_triple_gun_pickup():
 def spawn_grenade_pickup():
     return Pickup("Grenade", Sprite(Vec(40, 60), (10, 50, 20), circle = True), lambda: inventory.add(grenade, 1))
 
+
 def drop_loot(entity, team):
     chance = random.random()
     if chance < 0.5:
         player.world.add(entity.pos, spawn_triple_gun_pickup())
     else:
         player.world.add(entity.pos, spawn_shotgun_pickup())
-    
 
-def shake_screen(time):
+
+def shake_screen(time = 150):
     global screen_shake
     screen_shake = time
     
@@ -956,7 +911,7 @@ while True:
 
             render_offset = [0, 0]
             if screen_shake > 0:
-                amount = 3
+                amount = 2
                 render_offset[0] = random.randint(-amount, amount)
                 render_offset[1] = random.randint(-amount, amount)
                 screen_shake -= delta_time
