@@ -178,12 +178,10 @@ class World:
     def clamp_pos(self, pos, size):
         # keep entity within world bounds (stays a "radius" length from wall)
         if self.border:
-            pos.x = clamp(pos.x, \
-                              -self.size.x/2 + size.x/2, \
-                               self.size.x/2 - size.x/2)
-            pos.y = clamp(pos.y, \
-                              -self.size.y/2 + size.y/2, \
-                               self.size.y/2 - size.y/2)
+            pos.x = clamp(pos.x, -self.size.x/2 + size.x/2, \
+                                  self.size.x/2 - size.x/2)
+            pos.y = clamp(pos.y, -self.size.y/2 + size.y/2, \
+                                  self.size.y/2 - size.y/2)
         return pos
     
     def rand_pos(self):
@@ -223,24 +221,35 @@ class Sprite:
             if flip and random.randint(1, 2) == 1:
                     self.image = pygame.transform.flip(self.image, True, False)
         self.offset = offset
+        self.shake_timer = 0 # Timer to track how long to shake sprite
     
     def render_at(self, surface, pos):
         # Only draw shape if color is specified
         rect = rect_center(pos, self.size)
+        
+        if self.shake_timer > 0:
+            shake_dist = 2
+            rect.x += random.randint(-shake_dist, shake_dist)
+            rect.y += random.randint(-shake_dist, shake_dist)
+            self.shake_timer -= delta_time
+
         if self.color is not None:
             if self.circle:
                 shape = pygame.draw.ellipse
             else:
                 shape = pygame.draw.rect
             shape(surface, self.color, rect)
-            
         if self.image is not None: # Image may be overlayed on shape
             img_surf = pygame.transform.scale(self.image, (int(self.size.x), int(self.size.y)))
             surface.blit(img_surf, rect)
+            
+    def shake(self):
+        self.shake_timer = 75
+    
 
 
 class Stats:
-    def __init__(self, speed, max_health, team, damage = 0, invincible = False, post_func = None, destroy_on_hit = False, knockback = 0, mass = 1):
+    def __init__(self, speed, max_health, team, damage = 0, invincible = False, post_func = None, knockback = 0, mass = 1):
         self.entity = None
         self.speed = speed
         self.max_health = max_health
@@ -248,10 +257,7 @@ class Stats:
         self.invincible = invincible
         self.damage = damage
         self.team = team
-        
         self.post_func = post_func
-        self.destroy_on_hit = destroy_on_hit
-        
         self.knockback = knockback
         self.mass = mass
         self.destroyed = False
@@ -291,20 +297,24 @@ class Stats:
     
     def damages(self, s):
         # Entities damage enemy, neutral damages all
-        return (self.team == ALLY and s.team == ENEMY) \
+        return (self.team == ALLY and (s.team == ENEMY or s.team == NEUTRAL)) \
             or (self.team == ENEMY and s.team == ALLY) \
-            or self.team == NEUTRAL or s.team == NEUTRAL
+            or self.team == NEUTRAL
+    
+    def blocks(self, s):
+        return ((self.team == ALLY and s.team == ENEMY) \
+            or (self.team == ENEMY and s.team == ALLY) \
+            or self.team == NEUTRAL or s.team == NEUTRAL)
     
     def attack(self, s):
         if self.damages(s):
             if not s.invincible:
                 s.health -= self.damage
-                if s.health <= 0:
-                    shake_screen()
+                # Shake entity if alive and shake screen if dead
+                if s.is_alive() > 0 and isinstance(s, Projectile):
+                    s.entity.sprite.shake()
             # Accelerate with knockback force / mass
             s.entity.accel((s.entity.pos - self.entity.pos).get_norm() * (self.knockback/s.mass))
-            if self.destroy_on_hit:
-                self.destroy()
             
     def destroy(self):
         if not self.destroyed:
@@ -312,7 +322,6 @@ class Stats:
             self.health = 0
             if self.post_func is not None:
                 self.post_func(self.entity, self.team)
-            
             if self.entity is not player and self.entity is not None:
                 if self.entity.world is not None:
                     self.entity.world.remove(self.entity)
@@ -320,13 +329,13 @@ class Stats:
 
 
 class Entity:
-    def __init__(self, name, sprite, stats = None, size = None, solid = False): #, shake_time = 0):
+    def __init__(self, name, sprite, stats = None, size = None, solid = False):
         self.name = name
         self.world = None
         self.pos = Vec(0, 0)
         self.vel = Vec(0, 0)
         self.sprite = sprite
-
+        
         if stats is None:
             self.stats = Stats(0, 1, NEUTRAL, invincible = True)
         else:
@@ -339,7 +348,6 @@ class Entity:
             self.size = size
         
         self.solid = solid
-        #self.shake_time = shake_time # How long to shake after hitting solid object
 
     def render(self, surface):
         self.sprite.render_at(surface, screen_pos(self.pos))
@@ -353,7 +361,7 @@ class Entity:
         self.pos += self.vel * delta_time
         self.pos = self.world.clamp_pos(self.pos, self.size)
         self.stats.update()
-    
+        
     def accel(self, force): # Add to velocity vector, a = f/m
         self.vel += force
 
@@ -362,27 +370,21 @@ class Entity:
         
     def collide(self, other):
         self.stats.attack(other.stats)
-        
-        # Stop entities passing through vertically
+        # Stop other entities passing vertically through the base this entity
         if self.solid and not other.solid:
-            """if other.shake_time > 0:
-                shake_screen(other.shake_time)
-                print("yooo")
-            """
-            thickness = 10
             bottom = self.pos.y + self.size.y/2
             other_bottom = other.pos.y + other.size.y/2
-            if other_bottom < bottom:
-                other.pos.y = min(other_bottom + thickness, bottom) - other.size.y/2 - thickness
+            if other_bottom < bottom - 5:
+                other.pos.y = min(other_bottom + 18, bottom) - other.size.y/2 - 18
             else:
-                other.pos.y = max(other_bottom - thickness, bottom) - other.size.y/2 + thickness
-
+                other.pos.y = max(other_bottom - 10, bottom) - other.size.y/2 + 10
+    
     def get_hitbox(self, screen = False):
         pos = self.pos
         if screen:
             pos = screen_pos(pos)
         return rect_center(pos, self.size)
-
+    
     def set_world(self, world):
         world.add(Vec(0, 0), self)
 
@@ -430,8 +432,8 @@ class Player(Entity):
 
 
 class AIEntity(Entity):
-    def __init__(self, name, sprite, sight_range, stats, follow_weight):#, shake_time = 0):
-        super().__init__(name, sprite, stats)#, shake_time = shake_time)
+    def __init__(self, name, sprite, sight_range, stats, follow_weight):
+        super().__init__(name, sprite, stats)
         self.sight_range = sight_range
         self.follow_weight = follow_weight # Force propelling entity towards followed object
 
@@ -481,16 +483,20 @@ class AIEntity(Entity):
 
 
 class Projectile(Entity):
-    def __init__(self, name, sprite, Range, stats):
+    def __init__(self, name, sprite, Range, stats, blockable = True):
         super().__init__(name, sprite, stats)
         self.range = Range
         self.distance = 0
         self.init_vel = Vec(0, 0)
         self.lifetime = 0
-        #self.shake_time = shake_time
+        self.blockable = blockable
         
     def collide(self, e):
         super().collide(e)
+        if self.stats.blocks(e.stats):
+            e.sprite.shake()
+            if self.blockable:
+                self.stats.destroy()
 
     def shoot(self, angle, init_vel = Vec(0, 0)):
         self.vel.set_polar(self.stats.speed, angle)
@@ -698,24 +704,24 @@ def spawn_mini_boss(entity = None):
 
 def spawn_ally(entity = None):
     sprite = Sprite(Vec(70, 70), (25, 75, 220))
-    stats = Stats(0.44, 100, ALLY, 10.75, knockback = 0.01)
+    stats = Stats(0.44, 100, ALLY, 0.85, knockback = 0.01)
     return AIEntity("Ally", sprite, 400, stats, follow_weight = 0.075)
 
 
 def spawn_bullet(team, Range):
     sprite = Sprite(Vec(12, 12), (10, 10, 40), True)
-    stats = Stats(1.1, 100, team, damage = 25, invincible = True, destroy_on_hit = True, knockback = 1)
-    return Projectile("Bullet", sprite, Range, stats)
+    stats = Stats(1.1, 100, team, damage = 25, invincible = True, knockback = 0.625)
+    return Projectile("Bullet", sprite, Range, stats, blockable = True)
 
 def spawn_grenade(team, Range):
     sprite = Sprite(Vec(16, 24), (10, 50, 20), True)
-    stats = Stats(0.75, 100, team, damage = 0, invincible = True, destroy_on_hit = True, post_func = explode)
-    return Projectile("Grenade", sprite, Range, stats)
+    stats = Stats(0.75, 100, team, damage = 0, invincible = True, post_func = explode)
+    return Projectile("Grenade", sprite, Range, stats, blockable = True)
 
 def spawn_explosion(team, Range):
     sprite = Sprite(Vec(100, 100), (245, 160, 50), True)
-    stats = Stats(0.35, 100, NEUTRAL, damage = 5, invincible = True, destroy_on_hit = False, knockback = 0.2)
-    return Projectile("Explosion", sprite, Range, stats)
+    stats = Stats(0.35, 100, NEUTRAL, damage = 5, invincible = True, knockback = 0.2)
+    return Projectile("Explosion", sprite, Range, stats, blockable = False)
 
 
 
@@ -728,28 +734,25 @@ def explode(self, team):
         player.world.add(self.pos, fragment)
 
 
-def spawn_shotgun_pickup():
-    return Pickup("Shotgun", Sprite(Vec(60, 60), (0, 0, 0)), lambda: inventory.add(shotgun, 3))
+def spawn_shotgun_pickup(quantity = 5):
+    return Pickup("Shotgun", Sprite(Vec(60, 60), (0, 0, 0)), lambda: inventory.add(shotgun, quantity))
 
-def spawn_triple_gun_pickup():
-    return Pickup("Triple Gun", Sprite(Vec(55, 55), (75, 0, 0)), lambda: inventory.add(triple_gun, 3))
+def spawn_triple_gun_pickup(quantity = 5):
+    return Pickup("Triple Gun", Sprite(Vec(55, 55), (75, 0, 0)), lambda: inventory.add(triple_gun, quantity))
 
-def spawn_grenade_pickup():
-    return Pickup("Grenade", Sprite(Vec(40, 60), (10, 50, 20), circle = True), lambda: inventory.add(grenade, 1))
+def spawn_grenade_pickup(quantity = 5):
+    return Pickup("Grenade", Sprite(Vec(40, 60), (10, 50, 20), circle = True), lambda: inventory.add(grenade, quantity))
 
 
 def drop_loot(entity, team):
     chance = random.random()
-    if chance < 0.5:
-        player.world.add(entity.pos, spawn_triple_gun_pickup())
-    else:
+    if chance > 0.80:
+        player.world.add(entity.pos, spawn_grenade_pickup())
+    elif chance > 0.35:
         player.world.add(entity.pos, spawn_shotgun_pickup())
-
-
-def shake_screen(time = 150):
-    global screen_shake
-    screen_shake = time
-    
+    elif chance > 0.25:
+        player.world.add(entity.pos, spawn_triple_gun_pickup())
+        
 
 def debug(key, mouse_world_pos):
     if key == pygame.K_j:
@@ -805,7 +808,8 @@ while True:
     if __name__ == '__main__':
         
         worlds = []
-        screen_shake = 0
+        screen_shake_timer = 0
+        screen_shake_distance = 4
         
         overworld = World("Overworld", Vec(2000, 2000), (80, 170, 90), (220, 200, 140))
         worlds.append(overworld)
@@ -820,6 +824,7 @@ while True:
         triple_gun = WeaponItem("Triple gun", spawn_bullet, 450, repeat = 3, interval = 100)
         shotgun = WeaponItem("Shotgun", spawn_bullet, 300, count = 4, spread = 36)
         grenade = WeaponItem("Grenade", spawn_grenade, 350)
+        ally_summoner = SummonerItem("Spawn Ally", spawn_ally)
         ally_summoner = SummonerItem("Spawn Ally", spawn_ally)
 
         items = ( # every possible item
@@ -862,7 +867,6 @@ while True:
         forest_world.create_spawner(Spawner(5000, spawn_mini_boss, 1))
 
 
-        
         while True:
             delta_time = clock.tick(FPS) # time between each update cycle
             MOUSE_CLICKED = [False, False, False, False, False]
@@ -879,7 +883,6 @@ while True:
             MOUSE_HELD = pygame.mouse.get_pressed()
             MOUSE_POS = Vec(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
             MOUSE_SCROLL = 0
-            #MOUSE_MOVED = False
             
             for event in events:
                 if event.type == pygame.QUIT:
@@ -893,8 +896,6 @@ while True:
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button <= 3:
                         MOUSE_CLICKED[event.button - 1] = True
-                #elif event.type == pygame.MOUSEMOTION:
-                #    MOUSE_MOVED = True
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, world_pos(MOUSE_POS))
             if KEYS[pygame.K_r]:
@@ -903,20 +904,13 @@ while True:
             inventory.update(MOUSE_CLICKED[0], MOUSE_SCROLL)
             player.control()
             player.world.update()
-            player.world.render(GAME_SURFACE)
+            player.world.render(SCREEN)
             
             OVERLAY_SURFACE.fill((0, 0, 0, 0))
-            render_overlay(OVERLAY_SURFACE)
-            draw_cursor(OVERLAY_SURFACE)
-
-            render_offset = [0, 0]
-            if screen_shake > 0:
-                amount = 2
-                render_offset[0] = random.randint(-amount, amount)
-                render_offset[1] = random.randint(-amount, amount)
-                screen_shake -= delta_time
+            render_overlay(SCREEN)
+            draw_cursor(SCREEN)
                 
-            SCREEN.blit(GAME_SURFACE, render_offset)
+            #SCREEN.blit(GAME_SURFACE, (0, 0))
             
-            SCREEN.blit(OVERLAY_SURFACE, (0, 0))
+            #SCREEN.blit(OVERLAY_SURFACE, (0, 0))
             pygame.display.flip()
