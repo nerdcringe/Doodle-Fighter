@@ -114,7 +114,6 @@ current_cursor = None
 CURSOR_TARGET = load_image("cursor_target.png")
 CURSOR_PLACE = load_image("cursor_place.png")
 
-
 IMG_PLAYER_ALIVE = load_image("player_alive.png")
 IMG_PLAYER_DEAD = load_image("player_dead.png")
 
@@ -210,7 +209,7 @@ class Spawner:
 
 
 class Sprite:
-    def __init__(self, size, color = None, circle = False, image_name = None, flip = False, offset = Vec(0, 0)):
+    def __init__(self, size, color = None, circle = False, image_name = None, flip = False, offset = Vec(0, 0), label = False):
         self.size = Vec(size)
         self.color = color
         self.circle = circle
@@ -222,10 +221,11 @@ class Sprite:
                     self.image = pygame.transform.flip(self.image, True, False)
         self.offset = offset
         self.shake_timer = 0 # Timer to track how long to shake sprite
+        self.label = label
     
-    def render_at(self, surface, pos):
+    def render_at(self, surface, pos, entity):
         # Only draw shape if color is specified
-        rect = rect_center(pos, self.size)
+        rect = rect_center(pos + self.offset, self.size)
         
         if self.shake_timer > 0:
             shake_dist = 2
@@ -238,10 +238,13 @@ class Sprite:
                 shape = pygame.draw.ellipse
             else:
                 shape = pygame.draw.rect
+                
             shape(surface, self.color, rect)
         if self.image is not None: # Image may be overlayed on shape
             img_surf = pygame.transform.scale(self.image, (int(self.size.x), int(self.size.y)))
             surface.blit(img_surf, rect)
+        if self.label:
+            write(surface, entity.name, main_font, 13, screen_pos(entity.pos), (255, 255, 255), True)
             
     def shake(self):
         self.shake_timer = 75
@@ -350,7 +353,7 @@ class Entity:
         self.solid = solid
 
     def render(self, surface):
-        self.sprite.render_at(surface, screen_pos(self.pos))
+        self.sprite.render_at(surface, screen_pos(self.pos), self)
         if show_hitboxes:
             pygame.draw.rect(surface, (255, 255, 255), self.get_hitbox(True))
         self.stats.render_health_bar(surface)
@@ -371,13 +374,19 @@ class Entity:
     def collide(self, other):
         self.stats.attack(other.stats)
         # Stop other entities passing vertically through the base this entity
-        if self.solid and not other.solid:
+        if self.solid and not other.solid and not isinstance(other, Projectile):
             bottom = self.pos.y + self.size.y/2
             other_bottom = other.pos.y + other.size.y/2
+            # Keep base of other entity either above or below base of this entity
             if other_bottom < bottom - 5:
                 other.pos.y = min(other_bottom + 18, bottom) - other.size.y/2 - 18
             else:
                 other.pos.y = max(other_bottom - 10, bottom) - other.size.y/2 + 10
+            """other_bottom = other.pos.y + other.size.y/2
+            if other_bottom < self.pos.y:
+                other.pos.y = min(other_bottom, self.pos.y - self.size.y/2) - other.size.y/2
+            else:
+                other.pos.y = max(other_bottom, self.pos.y + self.size.y/2) - other.size.y/2"""
     
     def get_hitbox(self, screen = False):
         pos = self.pos
@@ -454,7 +463,7 @@ class AIEntity(Entity):
         if len(follow) == 0:
             # Curve angle of path slightly
             if self.wandering:
-                self.vel.set_polar(self.stats.speed*0.5, self.wander_angle)
+                self.vel.set_polar(self.stats.speed*0.33, self.wander_angle)
                 self.wander_angle += random.randint(-5, 5)
                 self.vel *= 0.85 # Slow down in case not accelerating
                 
@@ -525,18 +534,18 @@ class Projectile(Entity):
 
 
 class Pickup(Entity):
-    def __init__(self, name, sprite, func, size = None):
+    def __init__(self, name, sprite, collide_func, size = None):
         super().__init__(name, sprite, size = size)
-        self.func = func
+        self.collide_func = collide_func
         
     def render(self, surface):
         super().render(surface)
-        write(surface, self.name, main_font, 13, screen_pos(self.pos), (255, 255, 255), True)
+        #write(surface, self.name, main_font, 13, screen_pos(self.pos), (255, 255, 255), True)
         
     def collide(self, e):
         super().collide(e)
         if e is player:
-            self.func()
+            self.collide_func()
             self.stats.destroy()
 
 
@@ -670,8 +679,8 @@ class Inventory():
 
 
 def spawn_rock():
-    return Entity("Rock", Sprite(Vec(100, 60), image_name = "rock.png", flip = True), \
-            size = Vec(80, 40), solid = True)
+    sprite = Sprite(Vec(100, 60), image_name = "rock.png", flip = True)
+    return Entity("Rock", sprite, size = Vec(80, 40), solid = True)
 
 def spawn_copper(entity = None):
     sprite = Sprite(Vec(100, 60), image_name = "pickup_copper.png", flip = True)
@@ -707,6 +716,12 @@ def spawn_ally(entity = None):
     stats = Stats(0.44, 100, ALLY, 0.85, knockback = 0.01)
     return AIEntity("Ally", sprite, 400, stats, follow_weight = 0.075)
 
+"""
+def spawn_tracker_bullet(team, Range):
+    sprite = Sprite(Vec(12, 12), (10, 10, 100), True)
+    stats = Stats(1.1, 100, team, damage = 25, invincible = True, knockback = 0.625)
+    return AIEntity("Tracker Bullet", sprite, 400, stats, follow_weight = 0.075)"""
+
 
 def spawn_bullet(team, Range):
     sprite = Sprite(Vec(12, 12), (10, 10, 40), True)
@@ -735,13 +750,16 @@ def explode(self, team):
 
 
 def spawn_shotgun_pickup(quantity = 5):
-    return Pickup("Shotgun", Sprite(Vec(60, 60), (0, 0, 0)), lambda: inventory.add(shotgun, quantity))
+    sprite = Sprite(Vec(60, 60), (0, 0, 0), label = True)
+    return Pickup("Shotgun", sprite, lambda: inventory.add(shotgun, quantity))
 
 def spawn_triple_gun_pickup(quantity = 5):
-    return Pickup("Triple Gun", Sprite(Vec(55, 55), (75, 0, 0)), lambda: inventory.add(triple_gun, quantity))
+    sprite = Sprite(Vec(55, 55), (75, 0, 0), label = True)
+    return Pickup("Triple Gun", sprite, lambda: inventory.add(triple_gun, quantity))
 
 def spawn_grenade_pickup(quantity = 5):
-    return Pickup("Grenade", Sprite(Vec(40, 60), (10, 50, 20), circle = True), lambda: inventory.add(grenade, quantity))
+    sprite = Sprite(Vec(40, 60), (10, 50, 20), circle = True, label = True)
+    return Pickup("Grenade", sprite, lambda: inventory.add(grenade, quantity))
 
 
 def drop_loot(entity, team):
@@ -785,8 +803,6 @@ def debug(key, mouse_world_pos):
     elif key == pygame.K_v:
         global show_hitboxes
         show_hitboxes = not show_hitboxes
-    elif key == pygame.K_m:
-        shake_screen(2000)
     
 
 def render_overlay(surface):
@@ -820,9 +836,10 @@ while True:
         forest_world = World("Forest", Vec(2000, 2000), (35, 75, 65), (13, 46, 37))
         worlds.append(forest_world)
 
-        single_gun = WeaponItem("Single gun", spawn_bullet, 600, infinite = True)
-        triple_gun = WeaponItem("Triple gun", spawn_bullet, 450, repeat = 3, interval = 100)
+        single_gun = WeaponItem("Single gun", spawn_bullet, 500, infinite = True)
+        triple_gun = WeaponItem("Triple gun", spawn_bullet, 500, repeat = 3, interval = 100)
         shotgun = WeaponItem("Shotgun", spawn_bullet, 300, count = 4, spread = 36)
+        #tracker = WeaponItem("Tracker", spawn_tracker_bullet, 500)
         grenade = WeaponItem("Grenade", spawn_grenade, 350)
         ally_summoner = SummonerItem("Spawn Ally", spawn_ally)
         ally_summoner = SummonerItem("Spawn Ally", spawn_ally)
@@ -831,6 +848,7 @@ while True:
             single_gun,
             triple_gun,
             shotgun,
+            tracker,
             grenade,
             ally_summoner
         )
