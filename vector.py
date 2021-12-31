@@ -48,25 +48,28 @@ class Vec:
     def __neg__(self):
         return Vec(-self.x, -self.y)
 
-    def __str__(self):
-        return "({x}, {y})".format(x = round(self.x, 1), y = round(self.y, 1))
-    
-    def get_mag(self):
+    def mag(self):
         return math.sqrt(self.x**2 + self.y**2)
 
-    def get_angle(self):
+    def angle(self):
         return -math.degrees(math.atan2(self.y, self.x))
 
-    def get_rounded(self):
+    def rounded(self):
         return Vec(round(self.x), round(self.y))
     
     """ Get the normalized vector, keeping the ratio of the components """
-    def get_norm(self):
-        mag = self.get_mag()
+    def norm(self):
+        mag = self.mag()
         if mag == 0:
             return Vec(0, 0)
         return Vec(self.x / mag, self.y / mag)
     
-
     def dist(self, v):
         return math.hypot(self.x - v.x, self.x - v.x)
+
+    def tuple(self):
+        return (self.x, self.y)
+    
+    def __str__(self):
+        return "({x}, {y})".format(x = round(self.x, 1), y = round(self.y, 1))
+    

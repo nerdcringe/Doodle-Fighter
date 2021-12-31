@@ -18,15 +18,18 @@ NEUTRAL = 2         # Follows BOTH (if has AI) and damages BOTH
 
 debug_mode = False
 
-SIZE = Vec(0, 0)
-SCREEN = None
-WORLD_SURFACE = None
-GAME_SURFACE = None
-OVERLAY_SURFACE = None
+
+WINDOW_SIZE = (1200, 900)
+SIZE = Vec(1200, 900)
+WINDOW = pygame.display.set_mode(WINDOW_SIZE)
+GAME_SURFACE = pygame.Surface(SIZE.tuple())
+
+pygame.display.set_caption('lifesim')
+pygame.mouse.set_visible(False)
+
 
 main_font = "StayPuft.ttf"
 fonts = {}
-
 images = {}
 
 
@@ -45,20 +48,6 @@ def round_to(n, base):
     return base * round(float(n)/base)
 
 
-def set_screen_size(size):
-    global SIZE, SCREEN, GAME_SURFACE, OVERLAY_SURFACE
-    SIZE = Vec(size[0], size[1])
-    flags = pygame.RESIZABLE
-    SCREEN = pygame.display.set_mode(size, flags)
-    GAME_SURFACE = pygame.Surface(size, pygame.SRCALPHA, 32)
-    OVERLAY_SURFACE = pygame.Surface(size, pygame.SRCALPHA, 32)
-    
-
-set_screen_size((1200, 900))
-pygame.display.set_caption('lifesim')
-pygame.mouse.set_visible(False)
-
-
 def screen_pos(v):
     return v + SIZE/2 - player.pos
     
@@ -66,8 +55,8 @@ def world_pos(v):
     return v - SIZE/2 + player.pos
 
 def rect_center(pos, size):
-    rect = pygame.Rect(0, 0, size.x, size.y)
-    rect.center = (pos.x, pos.y)
+    rect = pygame.Rect((0, 0), size.tuple())
+    rect.center = pos.tuple()
     return rect
 
 
@@ -80,9 +69,9 @@ def write(surface, text, font_name, size, pos, color, center=False):
     text = Font.render(text, 1, color)
     
     if center:
-        text_rect = text.get_rect(center=(pos.x, pos.y))
+        text_rect = text.get_rect(center = pos.tuple())
     else:
-        text_rect = (pos.x, pos.y)
+        text_rect = pos.tuple()
     surface.blit(text, text_rect)
 
 
@@ -99,11 +88,10 @@ def load_image(name):
 
 def draw_cursor(surface):
     size = Vec(58, 58)
-    cursor = pygame.transform.scale(current_cursor, (size.x, size.y))
+    cursor = pygame.transform.scale(current_cursor, size.tuple())
     pos = MOUSE_POS
     
     if current_cursor == CURSOR_ARROW:
-        #pos = Vec(MOUSE_POS.x, MOUSE_POS.y - size.y/2)
         pos = Vec(MOUSE_POS + size/2)
         
     rect = rect_center(pos, size)
@@ -128,7 +116,7 @@ class World:
         self.bg_image = bg_image
         self.entities = []
         self.spawners = []
-        self.bg_surface = pygame.Surface((self.size.x, self.size.y), pygame.SRCALPHA, 32)
+        self.bg_surface = pygame.Surface(self.size.tuple(), pygame.SRCALPHA, 32)
         
         self.border = True
 
@@ -155,7 +143,9 @@ class World:
             self.bg_surface.blit(img_surf, rect)
     
     def render(self, surface):
-        SCREEN.fill(self.color_bg)
+        surface.fill(self.color_bg)
+        surface.blit(player.world.bg_surface, blit_pos.tuple())
+        
         self.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
         
         for e in self.entities:
@@ -199,7 +189,6 @@ class World:
         return Vec(random.randint(-x/2, x/2), random.randint(-y/2, y/2))
 
 
-
 class Spawner:
     def __init__(self, interval, spawn_func, max_num):
         self.world = None
@@ -228,11 +217,11 @@ class Sprite:
         if self.image is not None:
             if flip and random.randint(1, 2) == 1:
                 self.image = pygame.transform.flip(self.image, True, False)
+                
         if offset is None:
             self.offset = Vec(0, 0)
         else:
             self.offset = offset
-        
         self.shake_timer = 0 # Timer to track how long to shake sprite
     
     def render_at(self, surface, pos, entity = None):
@@ -255,7 +244,7 @@ class Sprite:
             img_surf = pygame.transform.scale(self.image, (int(self.size.x), int(self.size.y)))
             
             if entity is not None and isinstance(entity, Projectile):
-                img_surf = pygame.transform.rotate(img_surf, entity.vel.get_angle())
+                img_surf = pygame.transform.rotate(img_surf, entity.vel.angle())
                 rect = img_surf.get_rect(center = img_surf.get_rect(topleft = rect.topleft).center)
     
             surface.blit(img_surf, rect.copy())
@@ -291,11 +280,11 @@ class Stats:
 
     def render_health_bar(self, surface):
         if not self.invincible and self.health < self.max_health:# and self.entity is not player:
-            hitbox = self.entity.get_hitbox(True)
+            hitbox = self.entity.hitbox(True)
             total_width = math.sqrt(self.max_health) * 4#hitbox.width
             outline_pos = Vec(hitbox.center[0], hitbox.top - 13)
             
-            outline_rect = rect_center(outline_pos, Vec(total_width, 8))
+            outline_rect = rect_center(outline_pos, Vec(total_width, 6))
             #pygame.draw.rect(surface, (255, 255, 255), outline_rect.inflate(4, 4))
             pygame.draw.rect(surface, (0, 0, 0), outline_rect)
 
@@ -331,7 +320,7 @@ class Stats:
                 if s.is_alive() > 0 and isinstance(s, Projectile):
                     s.entity.sprite.shake()
             # Accelerate with knockback force / mass
-            s.entity.accel((s.entity.pos - self.entity.pos).get_norm() * (self.knockback/s.mass))
+            s.entity.accel((s.entity.pos - self.entity.pos).norm() * (self.knockback/s.mass))
             
     def destroy(self):
         if not self.destroyed:
@@ -372,14 +361,14 @@ class Entity:
     def render(self, surface):
         self.sprite.render_at(surface, screen_pos(self.pos), self)
         if debug_mode:
-            pygame.draw.rect(surface, (255, 255, 255), self.get_hitbox(True))
+            pygame.draw.rect(surface, (255, 255, 255), self.hitbox(True))
         self.stats.render_health_bar(surface)
         
     def update(self):
         self.lifetime += delta_time
         
-        if self.vel.get_mag() > self.stats.speed:
-            self.vel = self.vel.get_norm() * self.stats.speed
+        if self.vel.mag() > self.stats.speed:
+            self.vel = self.vel.norm() * self.stats.speed
         self.pos += self.vel * delta_time
         self.pos = self.world.clamp_pos(self.pos, self.size)
         self.stats.update()
@@ -391,7 +380,7 @@ class Entity:
         self.vel += force
 
     def colliding(self, other):
-        return self.get_hitbox().colliderect(other.get_hitbox())
+        return self.hitbox().colliderect(other.hitbox())
         
     def collide(self, other):
         self.stats.attack(other.stats)
@@ -405,7 +394,7 @@ class Entity:
             else:
                 other.pos.y = max(other_bottom - 10, bottom) - other.size.y/2 + 10
     
-    def get_hitbox(self, screen = False):
+    def hitbox(self, screen = False):
         pos = self.pos
         if screen:
             pos = screen_pos(pos)
@@ -454,13 +443,9 @@ class Player(Entity):
             if DOWN:
                 direction += Vec(0, 1)
                 vertical = True
-            self.accel(direction.get_norm() * 0.15)
+            self.accel(direction.norm() * 0.15)
             if not (horizontal or vertical): 
                 self.vel *= 0.85
-                
-    """def set_world(self, world):
-        super().set_world(world)
-        self.world.pre_render()"""
         
     def gain_wealth(self, amount):
         self.wealth += amount
@@ -508,19 +493,19 @@ class AIEntity(Entity):
             for e in follow:
                 # Vector towards: desired position - actual position
                 if not self.colliding(e):
-                    self.accel((e.pos - self.pos).get_norm() * self.follow_weight)
+                    self.accel((e.pos - self.pos).norm() * self.follow_weight)
                 else:
                     self.vel *= 0.96
                     
         for e in spread:
             # Only spread away from same team
             pos_diff = self.pos - e.pos
-            scalar = 1 / (pos_diff.get_mag() + 0.75) # Spread away more from closer entities
-            self.accel(pos_diff.get_norm() * scalar)
+            scalar = 1 / (pos_diff.mag() + 0.75) # Spread away more from closer entities
+            self.accel(pos_diff.norm() * scalar)
             
         # Slightly gravitate towards center of world
         center_dist = Vec(0, 0) - self.pos
-        self.accel(center_dist.get_norm() * (center_dist.get_mag() * 0.000005))
+        self.accel(center_dist.norm() * (center_dist.mag() * 0.000005))
         super().update()
 
 
@@ -548,7 +533,7 @@ class Projectile(Entity):
         super().update()
         # accumulate the change in position to get total distance
         relative_vel = self.vel - self.init_vel
-        self.distance += abs(relative_vel.get_mag() * delta_time)
+        self.distance += abs(relative_vel.mag() * delta_time)
         hits_border = False
 
         if self.world.border:
@@ -819,20 +804,24 @@ def explode(self, team):
 
 def drop_standard_loot(self, team):
     poof(self, team)
-    loot = [None, spawn_grenade_pickup, spawn_shotgun_pickup, spawn_triple_gun_pickup, spawn_apple_pickup]
+    loot = [None, spawn_grenade_pickup, spawn_shotgun_pickup, spawn_triple_gun_pickup, spawn_apple_pickup, spawn_ally_pickup]
     # Choose random loot item with differing weight %
-    chosen_func = random.choices(loot, [50, 10, 15, 15, 20])[0]
+    chosen_func = random.choices(loot, [50, 10, 15, 15, 20, 10])[0]
     if chosen_func is not None:
         player.world.add(self.pos, chosen_func())
-        
+    
 def drop_mini_boss_loot(self, team):
     poof(self, team)
     player.world.add(self.pos, spawn_shield_pickup())
-    
+
 def ally_death(self, team):
     poof(self, team)
     player.world.add(self.pos, spawn_grave())
 
+
+def spawn_ally_pickup(quantity = 4):
+    sprite = Sprite(Vec(80, 80), image = load_image("ally_summoner.png"))
+    return Pickup("Ally", sprite, lambda: inventory.add(ally_summoner, quantity))
 
 def spawn_shotgun_pickup(quantity = 8):
     sprite = Sprite(Vec(55, 55), (0, 0, 0), image = load_image("icon_shotgun.png"))
@@ -890,13 +879,15 @@ def debug(key, mouse_world_pos):
         
     elif key == pygame.K_m:
         player.world.add(mouse_world_pos, spawn_apple_pickup())
+    elif key == pygame.K_l:
+        player.world.add(mouse_world_pos, spawn_ally_pickup())
     
 
 def render_overlay(surface):
     stat_texts = [
         #
         #"Item: " + inventory.get_selected_info(),
-        "Position: " + str(player.pos.get_rounded()),
+        "Position: " + str(player.pos.rounded()),
         "World: " + player.world.name,
         #"Wealth: " + str(player.wealth),
         "Health: " + str(max(0, round(player.stats.health))) + "/" + str(max(0, round(player.stats.max_health))),
@@ -939,7 +930,7 @@ while True:
         triple_gun = WeaponItem("Triple gun", spawn_bullet, 450, repeat = 3, interval = 100, image = load_image("icon_triple_gun.png"))
         shotgun = WeaponItem("Shotgun", spawn_bullet, 250, count = 4, spread = 36, image = load_image("icon_shotgun.png"))
         grenade = WeaponItem("Grenade", spawn_grenade, 300, image = load_image("icon_grenade.png"))
-        ally_summoner = SummonerItem("Spawn Ally", spawn_ally)
+        ally_summoner = SummonerItem("Spawn Ally", spawn_ally, image = load_image("ally_summoner.png"))
         apple = Item("Apple", click_func = lambda: player.heal(25), image = load_image("icon_apple.png"))
 
         items = ( # every possible item
@@ -975,10 +966,8 @@ while True:
                 pos = Vec(x * (city_world.size.x/(size-1)), y * (city_world.size.y/(size-1)))
                 pos -= city_world.size/2
                 pos *= 0.75
-                if not((x == 2 and y == 1) or (x == 1 and y == 2)):
+                if y == 0 or y == 3  or x == 0 or x == 3:
                     city_world.add(pos, spawn_building())
-                else:
-                    city_world.add(pos, spawn_tree())
             
         for i in range(5):
             overworld.add(overworld.rand_pos(), spawn_rock())
@@ -1021,7 +1010,7 @@ while True:
                     pygame.quit()
                     sys.exit()
                 elif event.type == pygame.VIDEORESIZE:
-                    set_screen_size(event.size)
+                    WINDOW = pygame.display.set_mode(event.size, pygame.RESIZABLE)
                 elif event.type == pygame.MOUSEWHEEL:
                     MOUSE_SCROLL = event.y
                 elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -1036,15 +1025,13 @@ while True:
             player.control()
             player.world.update()
             
-            GAME_SURFACE.fill((0, 0, 0, 0))
-            player.world.render(GAME_SURFACE)
-            
-            OVERLAY_SURFACE.fill((0, 0, 0, 0))
-            render_overlay(OVERLAY_SURFACE)
-            draw_cursor(OVERLAY_SURFACE)
-
             blit_pos = screen_pos(-player.world.size/2)
-            SCREEN.blit(player.world.bg_surface, (blit_pos.x, blit_pos.y))
-            SCREEN.blit(GAME_SURFACE, (0, 0))
-            SCREEN.blit(OVERLAY_SURFACE, (0, 0))
+            
+            player.world.render(GAME_SURFACE)
+            render_overlay(GAME_SURFACE)
+            draw_cursor(GAME_SURFACE)
+            WINDOW.blit(pygame.transform.scale(GAME_SURFACE, WINDOW_SIZE), (0, 0))
+            
+            
+            
             pygame.display.flip()
