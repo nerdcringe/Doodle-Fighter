@@ -55,7 +55,7 @@ class Vec:
         return math.sqrt(self.x**2 + self.y**2)
 
     def get_angle(self):
-        return math.degrees(math.atan2(self.y, self.x))
+        return -math.degrees(math.atan2(self.y, self.x))
 
     def get_rounded(self):
         return Vec(round(self.x), round(self.y))
