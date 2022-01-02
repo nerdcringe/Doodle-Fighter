@@ -19,9 +19,8 @@ NEUTRAL = 2         # Follows BOTH (if has AI) and damages BOTH
 debug_mode = False
 
 
-WINDOW_SIZE = (1200, 900)
 SIZE = Vec(1200, 900)
-WINDOW = pygame.display.set_mode(WINDOW_SIZE)
+WINDOW = pygame.display.set_mode(SIZE.tuple(), pygame.DOUBLEBUF)
 GAME_SURFACE = pygame.Surface(SIZE.tuple())
 
 pygame.display.set_caption('lifesim')
@@ -98,13 +97,12 @@ def draw_cursor(surface):
     surface.blit(cursor, rect)
 
 
+SCREEN_RECT = rect_center(Vec(0, 0), SIZE)
 
 current_cursor = None
 CURSOR_TARGET = load_image("cursor_target.png")
 CURSOR_ARROW = load_image("CURSOR_ARROW.png")
 
-IMG_PLAYER_ALIVE = load_image("player_alive.png")
-IMG_PLAYER_DEAD = load_image("player_dead.png")
 
 
 class World:
@@ -144,6 +142,7 @@ class World:
     
     def render(self, surface):
         surface.fill(self.color_bg)
+        blit_pos = screen_pos(-player.world.size/2)
         surface.blit(player.world.bg_surface, blit_pos.tuple())
         
         self.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
@@ -219,43 +218,44 @@ class Spawner:
 class Sprite:
     def __init__(self, size, color = None, circle = False, image = None, flip = False, offset = None):
         self.size = Vec(size)
-        self.color = color
-        self.circle = circle
-        self.image = image
-        if self.image is not None:
-            if flip:
-                self.image = pygame.transform.flip(self.image, True, False)
+        image = image
+        if image is not None and flip:
+            image = pygame.transform.flip(image, True, False)
                 
+        self.shake_timer = 0 # Timer to track how long to shake sprite
         if offset is None:
             self.offset = Vec(0, 0)
         else:
             self.offset = offset
-        self.shake_timer = 0 # Timer to track how long to shake sprite
-    
-    def render_at(self, surface, pos, entity = None):
-        # Only draw shape if color is specified
-        rect = rect_center(pos + self.offset, self.size).copy()
         
-        if self.shake_timer > 0:
-            shake_dist = 2
-            rect.x += random.randint(-shake_dist, shake_dist)
-            rect.y += random.randint(-shake_dist, shake_dist)
-            self.shake_timer -= delta_time
-            
-        if self.color is not None:
-            if self.circle:
-                pygame.draw.ellipse(surface, self.color, rect)
+        self.surface = pygame.Surface(size.tuple(), pygame.SRCALPHA, 32).convert_alpha()
+        rect = pygame.Rect((0, 0), self.size.tuple())
+        # Only draw shape if color is specified
+        if color is not None:
+            if circle:
+                pygame.draw.ellipse(self.surface, color, rect)
             else:
-                pygame.draw.rect(surface, self.color, rect, border_radius = 3)
-                
-        if self.image is not None: # Image may be overlayed on shape
-            img_surf = pygame.transform.scale(self.image, (int(self.size.x), int(self.size.y)))
-            
-            if entity is not None and isinstance(entity, Projectile) and entity.rotate:
-                img_surf = pygame.transform.rotate(img_surf, entity.vel.angle())
-                rect = img_surf.get_rect(center = img_surf.get_rect(topleft = rect.topleft).center)
+                pygame.draw.rect(self.surface, color, rect, border_radius = 3)
+        if image is not None: # Image may be overlayed on shape
+            image = pygame.transform.scale(image, (int(self.size.x), int(self.size.y)))
+            self.surface.blit(image, rect)
     
-            surface.blit(img_surf, rect.copy())
+    def rotate(self, angle):
+        self.surface = pygame.transform.rotate(self.surface, angle)
+
+    def render_at(self, surface, pos, entity = None):
+        render = False
+        if entity is not None: # Only render if on screen
+            render = SCREEN_RECT.colliderect(entity.hitbox(True))
+        offset = self.offset
+        if self.shake_timer > 0:
+            dist = 2 
+            offset += Vec(random.randint(-dist, dist), random.randint(-dist, dist))
+            self.shake_timer -= delta_time
+
+        rect = rect_center(pos + offset, self.size)
+        rect = self.surface.get_rect(center = self.surface.get_rect(topleft = rect.topleft).center)
+        surface.blit(self.surface, rect)
             
     def shake(self):
         self.shake_timer = 75
@@ -349,7 +349,6 @@ class Entity:
         self.pos = Vec(0, 0)
         self.vel = Vec(0, 0)
         self.sprite = sprite
-
         self.max_lifetime = max_lifetime # if max_liftime == -1, don't count lifetime
         self.lifetime = 0
         
@@ -358,7 +357,7 @@ class Entity:
         else:
             self.stats = stats
         self.stats.entity = self
-
+        
         if size is None:
             self.size = Vec(self.sprite.size)
         else:
@@ -369,7 +368,7 @@ class Entity:
     def render(self, surface):
         self.sprite.render_at(surface, screen_pos(self.pos), self)
         if debug_mode:
-            pygame.draw.rect(surface, (255, 255, 255), self.hitbox(True))
+            pass#pygame.draw.rect(surface, (255, 255, 255), self.hitbox(True))
         self.stats.render_health_bar(surface)
         
     def update(self):
@@ -422,15 +421,19 @@ class Player(Entity):
         #self.max_energy = 100
         #self.energy = self.max_energy
         self.wealth = 0
+        self.last_alive = True
 
     def update(self):
         super().update()
-        if self.stats.is_alive():
-            self.sprite.image = IMG_PLAYER_ALIVE
-        else:
-            self.sprite.image = IMG_PLAYER_DEAD
+        alive = self.stats.is_alive()
+        if alive and not self.last_alive:
+            self.sprite = SPRITE_PLAYER_ALIVE
+        if not alive:
             self.vel *= 0.95
-
+            if self.last_alive:
+                self.sprite = SPRITE_PLAYER_DEAD
+        self.last_alive = alive
+        
         #self.energy += 0.01
         #self.energy = clamp(self.energy, 0 , self.max_energy)
         
@@ -535,6 +538,8 @@ class Projectile(Entity):
 
     def shoot(self, angle, init_vel = Vec(0, 0)):
         self.vel.set_polar(self.stats.speed, angle)
+        if self.rotate:
+            self.sprite.rotate(self.vel.angle())
         self.init_vel = init_vel
         self.vel += init_vel
         
@@ -785,12 +790,12 @@ def spawn_explosion(team, Range):
 
 def spawn_poof(Range):
     sprite = Sprite(Vec(75, 75), image = load_image("poof.png"))
-    stats = Stats(0.4, 100, NEUTRAL, damage = 0, invincible = True, mass = 100, knockback = 0.0)
+    stats = Stats(0.4, 100, NEUTRAL, damage = 0, invincible = True)
     return Projectile("Poof", sprite, Range, stats, blockable = False)
 
 def spawn_grave():
-    sprite = Sprite(Vec(100, 100), image = load_image("grave.png"))
-    return Entity("Grave", sprite, size = Vec(75, 85), solid = True, max_lifetime = 10000)
+    sprite = Sprite(Vec(90, 80), image = load_image("grave.png"))
+    return Entity("Grave", sprite, size = Vec(70, 80), solid = True, max_lifetime = 10000)
 
 def spawn_car(Range, side = False):
     if side:
@@ -919,7 +924,7 @@ def render_overlay(surface):
 
     if debug_mode:
         stat_texts.append("# Entities: " + str(len(player.world.entities)))
-        stat_texts.append("FPS: " + str(round(clock.get_fps())))
+        stat_texts.append("FPS: " + str(round(clock.get_fps(), 1)))
     y = SIZE.y - 15
     for stat in stat_texts:
         y -= 35
@@ -932,6 +937,13 @@ def render_overlay(surface):
             image = pygame.transform.scale(image, (100, 100))
             rect = rect_center(Vec(SIZE.x - 175, SIZE.y - 75), Vec(100, 100))
             surface.blit(image, rect)
+
+pygame.event.set_allowed([pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.MOUSEWHEEL])
+
+
+SPRITE_PLAYER_ALIVE = Sprite(Vec(65, 65), (255, 240, 0), circle = True, image = load_image("player_alive.png"))
+SPRITE_PLAYER_DEAD = Sprite(Vec(65, 65), (255, 240, 0), circle = True, image = load_image("player_dead.png"))
+
 
 
 while True:
@@ -976,8 +988,7 @@ while True:
         }
         inventory = Inventory(contents)
 
-        player_sprite = Sprite(Vec(65, 65), (255, 240, 0), circle = True, image = load_image("player_alive.png"))
-        player = Player(player_sprite, Stats(0.55, 100, ALLY, 0, invincible = False))
+        player = Player(SPRITE_PLAYER_ALIVE, Stats(0.55, 100, ALLY, 0, invincible = False))
         overworld.add(Vec(0, 0), player)
 
         for i in range(15):
@@ -998,12 +1009,12 @@ while True:
                     city_world.add(pos, spawn_building())
         car_y = [-1200, -650, 550, 1150]
         for i in range(4):
-            interval = random.randint(2000, 5000)
+            interval = random.randint(4000, 8000)
             city_world.add_spawner(Spawner(interval, lambda x: spawn_car(2400, True), 10, Vec(-1175, car_y[i])))
             
         car_x = [-1200, -625, 600, 1200]
         for i in range(4):
-            interval = random.randint(2000, 5000)
+            interval = random.randint(4000, 8000)
             city_world.add_spawner(Spawner(interval, lambda x: spawn_car(2400, False), 10, Vec(car_x[i], -1200)))
 
         for i in range(8):
@@ -1050,8 +1061,8 @@ while True:
                     print("Exited")
                     pygame.quit()
                     sys.exit()
-                elif event.type == pygame.VIDEORESIZE:
-                    WINDOW = pygame.display.set_mode(event.size, pygame.RESIZABLE)
+                #elif event.type == pygame.VIDEORESIZE:
+                #    WINDOW = pygame.display.set_mode(event.size, pygame.RESIZABLE)
                 elif event.type == pygame.MOUSEWHEEL:
                     MOUSE_SCROLL = event.y
                 elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -1061,16 +1072,16 @@ while True:
                     debug(event.key, world_pos(MOUSE_POS))
             if KEYS[pygame.K_r]:
                 break
-            
-            inventory.update(MOUSE_CLICKED[0], MOUSE_SCROLL)
+
+            if player.stats.is_alive():
+                inventory.update(MOUSE_CLICKED[0], MOUSE_SCROLL)
             player.control()
             player.world.update()
-            
-            blit_pos = screen_pos(-player.world.size/2)
             
             player.world.render(GAME_SURFACE)
             render_overlay(GAME_SURFACE)
             draw_cursor(GAME_SURFACE)
-            WINDOW.blit(pygame.transform.scale(GAME_SURFACE, WINDOW_SIZE), (0, 0))
+            #WINDOW.blit(pygame.transform.scale(GAME_SURFACE, WINDOW_SIZE), (0, 0))
+            WINDOW.blit(GAME_SURFACE, (0, 0))
             
             pygame.display.flip()
