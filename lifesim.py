@@ -170,7 +170,7 @@ class World:
                         s.spawned.remove(e)
         #del e
 
-    def create_spawner(self, spawner):
+    def add_spawner(self, spawner):
         self.spawners.append(spawner)
         spawner.world = self
 
@@ -190,12 +190,13 @@ class World:
 
 
 class Spawner:
-    def __init__(self, interval, spawn_func, max_num):
+    def __init__(self, interval, spawn_func, max_num, dest = None):
         self.world = None
         self.interval = interval
         self.time = 0
         self.spawn_func = spawn_func
         self.max_num = max_num
+        self.dest = dest # Specific position to spawn in world
         self.spawned = []
         
     def update(self):
@@ -204,7 +205,14 @@ class Spawner:
             if len(self.spawned) < self.max_num:
                 entity = self.spawn_func(self)
                 self.spawned.append(entity)
-                self.world.add(self.world.rand_pos(), entity)
+
+                spawn_pos = Vec(0, 0)
+                if self.dest is None: # If dest is none, random position in world
+                    spawn_pos = self.world.rand_pos()
+                else:
+                    spawn_pos = self.dest # Else destination is specific position in world
+                
+                self.world.add(spawn_pos, entity)
             self.time = 0
 
 
@@ -215,7 +223,7 @@ class Sprite:
         self.circle = circle
         self.image = image
         if self.image is not None:
-            if flip and random.randint(1, 2) == 1:
+            if flip:
                 self.image = pygame.transform.flip(self.image, True, False)
                 
         if offset is None:
@@ -243,7 +251,7 @@ class Sprite:
         if self.image is not None: # Image may be overlayed on shape
             img_surf = pygame.transform.scale(self.image, (int(self.size.x), int(self.size.y)))
             
-            if entity is not None and isinstance(entity, Projectile):
+            if entity is not None and isinstance(entity, Projectile) and entity.rotate:
                 img_surf = pygame.transform.rotate(img_surf, entity.vel.angle())
                 rect = img_surf.get_rect(center = img_surf.get_rect(topleft = rect.topleft).center)
     
@@ -510,12 +518,13 @@ class AIEntity(Entity):
 
 
 class Projectile(Entity):
-    def __init__(self, name, sprite, Range, stats, blockable = True):
-        super().__init__(name, sprite, stats)
+    def __init__(self, name, sprite, Range, stats = None, size = None, blockable = True, rotate = True):
+        super().__init__(name, sprite, stats, size = size)
         self.range = Range
         self.distance = 0
         self.init_vel = Vec(0, 0)
         self.blockable = blockable
+        self.rotate = rotate
         
     def collide(self, e):
         super().collide(e)
@@ -534,17 +543,18 @@ class Projectile(Entity):
         # accumulate the change in position to get total distance
         relative_vel = self.vel - self.init_vel
         self.distance += abs(relative_vel.mag() * delta_time)
-        hits_border = False
 
-        if self.world.border:
-            # hits border if within "radius" length.
-            outer_pos = Vec(abs(self.pos.x), abs(self.pos.y)) + self.sprite.size/2
-            ground_size = self.world.size/2
+        hits_border = False
+        if self.world is not None:
+            if self.world.border:
+                # hits border if within "radius" length.
+                outer_pos = Vec(abs(self.pos.x), abs(self.pos.y)) + self.size/2
+                ground_size = self.world.size/2
+                
+                # wall_dist > 0 when outer edge of sprite is outside world border
+                wall_dist = Vec(abs(outer_pos.x) - abs(ground_size.x), abs(outer_pos.y) - abs(ground_size.y))
+                hits_border = (wall_dist.x >= 0 or wall_dist.y >= 0) and self.lifetime > 0 and self.blockable
             
-            # wall_dist > 0 when outer edge of sprite is outside world border
-            wall_dist = Vec(abs(outer_pos.x) - abs(ground_size.x), abs(outer_pos.y) - abs(ground_size.y))
-            hits_border = (wall_dist.x >= 0 or wall_dist.y >= 0) and self.lifetime > 0
-        
         if self.distance > self.range or hits_border:
             self.stats.destroy()
 
@@ -782,6 +792,20 @@ def spawn_grave():
     sprite = Sprite(Vec(100, 100), image = load_image("grave.png"))
     return Entity("Grave", sprite, size = Vec(75, 85), solid = True, max_lifetime = 10000)
 
+def spawn_car(Range, side = False):
+    if side:
+        sprite = Sprite(Vec(120, 120), image = load_image("car_side.png"))
+        angle = 0
+    else:
+        sprite = Sprite(Vec(100, 100), image = load_image("car_front.png"))
+        angle = 90
+        
+    stats = Stats(0.3, 100, NEUTRAL, damage = 15, invincible = False, mass = 500, knockback = 5, post_func = explode)
+    car = Projectile("Car", sprite, Range, stats, size = Vec(90, 80), blockable = True, rotate = False)
+    car.shoot(angle)
+    return car
+
+
 def poof(self, team = NEUTRAL):
     num = random.randint(3, 6)
     init_angle = random.randint(0, 360/num)
@@ -797,7 +821,7 @@ def explode(self, team):
     init_angle = random.randint(0, 360/num)
     for i in range(num):
         angle = (i * (360/num)) + init_angle
-        fragment = spawn_explosion(team, 50)
+        fragment = spawn_explosion(team, 60)
         fragment.shoot(angle)#, entity.vel)
         player.world.add(self.pos, fragment)
 
@@ -956,9 +980,13 @@ while True:
         player = Player(player_sprite, Stats(0.55, 100, ALLY, 0, invincible = False))
         overworld.add(Vec(0, 0), player)
 
-        for i in range(12):
+        for i in range(15):
             # random position, spread out from center
             overworld.add(overworld.rand_pos() * 1.25, spawn_tree())
+            
+        for i in range(5):
+            overworld.add(overworld.rand_pos(), spawn_rock())
+
 
         size = 4
         for x in range(size):
@@ -968,21 +996,34 @@ while True:
                 pos *= 0.75
                 if y == 0 or y == 3  or x == 0 or x == 3:
                     city_world.add(pos, spawn_building())
+        car_y = [-1200, -650, 550, 1150]
+        for i in range(4):
+            interval = random.randint(2000, 5000)
+            city_world.add_spawner(Spawner(interval, lambda x: spawn_car(2400, True), 10, Vec(-1175, car_y[i])))
             
-        for i in range(5):
-            overworld.add(overworld.rand_pos(), spawn_rock())
+        car_x = [-1200, -625, 600, 1200]
+        for i in range(4):
+            interval = random.randint(2000, 5000)
+            city_world.add_spawner(Spawner(interval, lambda x: spawn_car(2400, False), 10, Vec(car_x[i], -1200)))
+
+        for i in range(8):
+            city_world.add(city_world.rand_pos() * 0.375 - Vec(0, 35), spawn_tree())
+
+
         for i in range(20):
             forest_world.add(forest_world.rand_pos() * 1.125, spawn_winter_tree())
         for i in range(6):
             forest_world.add(forest_world.rand_pos(), spawn_rock())
 
-        overworld.create_spawner(Spawner(2000, spawn_enemy, 4))
-        #city_world.create_spawner(Spawner(1500, spawn_enemy, 6))
-        #cave_world.create_spawner(Spawner(1000, spawn_enemy, 5))
-        cave_world.create_spawner(Spawner(1000, spawn_copper, 3))
-        cave_world.create_spawner(Spawner(1000, spawn_gold, 5))
+
+        overworld.add_spawner(Spawner(2000, spawn_enemy, 4))
+        #city_world.add_spawner(Spawner(1500, spawn_enemy, 7))
+        #cave_world.add_spawner(Spawner(1000, spawn_enemy, 5))
+
+        cave_world.add_spawner(Spawner(1000, spawn_copper, 3))
+        cave_world.add_spawner(Spawner(1000, spawn_gold, 5))
         
-        forest_world.create_spawner(Spawner(5000, spawn_mini_boss, 1))
+        forest_world.add_spawner(Spawner(5000, spawn_mini_boss, 1))
 
         for world in worlds:
             world.pre_render()
@@ -1031,7 +1072,5 @@ while True:
             render_overlay(GAME_SURFACE)
             draw_cursor(GAME_SURFACE)
             WINDOW.blit(pygame.transform.scale(GAME_SURFACE, WINDOW_SIZE), (0, 0))
-            
-            
             
             pygame.display.flip()
