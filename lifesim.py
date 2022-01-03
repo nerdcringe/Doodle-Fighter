@@ -119,17 +119,7 @@ class World:
         self.border = True
 
     def update(self):
-        for e in self.entities:
-            if e is not None:
-                e.update()
-        for e1 in self.entities:
-            if e1 is not None:
-                for e2 in self.entities:
-                    if e2 is not None and e1 != e2:
-                        if e1.colliding(e2):
-                            e1.collide(e2)
-        for s in self.spawners:
-            s.update()
+        pass
 
     def pre_render(self):
         rect = rect_center(self.size/2, self.size)
@@ -141,14 +131,7 @@ class World:
             self.bg_surface.blit(img_surf, rect)
     
     def render(self, surface):
-        surface.fill(self.color_bg)
-        blit_pos = screen_pos(-player.world.size/2)
-        surface.blit(player.world.bg_surface, blit_pos.tuple())
-        
-        self.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
-        
-        for e in self.entities:
-            e.render(surface)
+        pass
             
     def add(self, pos, e):
         if e.world is not None:
@@ -175,11 +158,11 @@ class World:
 
     def clamp_pos(self, pos, size):
         # keep entity within world bounds (stays a "radius" length from wall)
+        w = self.size/2
+        e = size/2
         if self.border:
-            pos.x = clamp(pos.x, -self.size.x/2 + size.x/2, \
-                                  self.size.x/2 - size.x/2)
-            pos.y = clamp(pos.y, -self.size.y/2 + size.y/2, \
-                                  self.size.y/2 - size.y/2)
+            pos.x = clamp(pos.x, -w.x + e.x, w.x - e.x)
+            pos.y = clamp(pos.y, -w.y - e.y + 15, w.y - e.y)
         return pos
     
     def rand_pos(self):
@@ -343,14 +326,14 @@ class Stats:
 
 
 class Entity:
-    def __init__(self, name, sprite, stats = None, size = None, solid = False, max_lifetime = -1):
+    def __init__(self, name, sprite, stats = None, size = None, solid = False, lifetime = -1):
         self.name = name
         self.world = None
         self.pos = Vec(0, 0)
         self.vel = Vec(0, 0)
         self.sprite = sprite
-        self.max_lifetime = max_lifetime # if max_liftime == -1, don't count lifetime
-        self.lifetime = 0
+        self.lifetime = lifetime # if max_liftime == -1, don't count lifetime
+        self.time = 0
         
         if stats is None:
             self.stats = Stats(0, 1, NEUTRAL, invincible = True)
@@ -372,15 +355,14 @@ class Entity:
         self.stats.render_health_bar(surface)
         
     def update(self):
-        self.lifetime += delta_time
-        
         if self.vel.mag() > self.stats.speed:
             self.vel = self.vel.norm() * self.stats.speed
         self.pos += self.vel * delta_time
         self.pos = self.world.clamp_pos(self.pos, self.size)
         self.stats.update()
 
-        if self.lifetime > self.max_lifetime and self.max_lifetime != -1:
+        self.time += delta_time
+        if self.time > self.lifetime and self.lifetime != -1:
             self.stats.destroy()
         
     def accel(self, force): # Add to velocity vector, a = f/m
@@ -565,15 +547,15 @@ class Projectile(Entity):
 
 
 class Pickup(Entity):
-    def __init__(self, name, sprite, collide_func, size = None):
-        super().__init__(name, sprite, size = size)
+    def __init__(self, name, sprite, collide_func, size = None, lifetime = -1):
+        super().__init__(name, sprite, size = size, lifetime = lifetime)
         self.collide_func = collide_func
         
     def render(self, surface):
         # Bob up and down to indicate that this is a pickup
         freq = 0.0025
         amp = 10
-        self.sprite.offset.y = (math.sin(self.lifetime * freq) * amp)
+        self.sprite.offset.y = (math.sin(self.time * freq) * amp)
         super().render(surface)
         #write(surface, self.name, main_font, 13, screen_pos(self.pos), (255, 255, 255), True)
         
@@ -585,13 +567,11 @@ class Pickup(Entity):
             
 
 class Item():
-    def __init__(self, name, image = None, infinite = False, click_func = None, cooldown = 0):
+    def __init__(self, name, image = None, infinite = False, click_func = None):
         self.name = name
         self.image = image
         self.infinite = infinite
         self.click_func = click_func
-        self.cooldown = cooldown
-        self.cooldown_timer = 0
         self.in_use = False
         
     def select(self):
@@ -599,18 +579,12 @@ class Item():
         current_cursor = CURSOR_ARROW
         pass
     
-    def can_use(self):
-        return self.cooldown_timer >= self.cooldown
-    
     def click(self):
-        if self.can_use():
-            self.cooldown_timer = 0
-            if self.click_func is not None:
+        if self.click_func is not None:
                 self.click_func()
     
     def update(self, entity, team):
-        if self.cooldown_timer < self.cooldown:
-            self.cooldown_timer += delta_time
+        pass
 
 
 class SummonerItem(Item):
@@ -632,15 +606,15 @@ class SummonerItem(Item):
 
 
 class WeaponItem(Item):
-    def __init__(self, name, spawn_func, Range, infinite = False, image = None, count = 1, repeat = 1, interval = 0, spread = 0, cooldown = 0):
-        super().__init__(name, image, infinite, cooldown = cooldown)
+    def __init__(self, name, spawn_func, Range, infinite = False, image = None, count = 1, repeat = 1, interval = 0, spread = 0):
+        super().__init__(name, image, infinite)
         self.spawn_func = spawn_func
         self.range = Range
         self.count = count                  # number of projectile spawns per shot
         self.repeat = repeat                # number of repeated shots with delay in between
         self.current_repeat = self.repeat
+        self.repeat_timer = 0
         self.interval = interval            # time (ms) between repeated shots (times)
-        self.timer = 0
         self.spread = spread                # total angle (deg) of shot spread 
         self.current_spread = 0
     
@@ -648,7 +622,7 @@ class WeaponItem(Item):
         global current_cursor
         current_cursor = CURSOR_TARGET
         
-    def click(self):
+    """def click(self):
         if self.can_use():
             super().click()
             if self.current_repeat >= self.repeat:
@@ -669,6 +643,32 @@ class WeaponItem(Item):
                 self.current_repeat += 1
             self.timer += delta_time
         elif self.timer :
+            self.in_use = False"""
+
+    def click(self):
+        if not self.in_use:
+            super().click()
+            self.in_use = True
+            self.current_repeat = 0 # Reset repeat amount
+            self.current_spread = -self.spread/2 # Set spread angle to one side of angle
+            self.repeat_timer = self.interval # Reset timer (shoots at 0)
+
+    def update(self, entity, team):
+        super().update(entity, team)
+        if self.current_repeat < self.repeat: # If still needs to repeat
+            if self.repeat_timer >= self.interval: # Shoots when timer is 0
+
+                # Shoot self.count # of bullets at a time
+                for i in range(self.count):
+                    self.summon_bullet(entity, team)
+                    if self.count != 1:
+                        self.current_spread += self.spread/(self.count - 1)
+                        
+                self.current_repeat += 1
+                self.repeat_timer = 0
+            self.repeat_timer += delta_time
+            print(self.repeat_timer)
+        else:
             self.in_use = False
 
     def summon_bullet(self, entity, team):
@@ -762,9 +762,9 @@ def spawn_enemy(entity = None):
     stats = Stats(0.45, 100, ENEMY, 0.75, knockback = 0.01, post_func = drop_standard_loot)
     return AIEntity("Enemy", sprite, 500, stats, follow_weight = 0.06)
 
-def spawn_mini_boss(entity = None):
+def spawn_boss(entity = None):
     sprite = Sprite(Vec(105, 105), (150, 25, 5), image = load_image("enemy.png"))
-    stats = Stats(0.55, 500, ENEMY, 1.5, knockback = 0.05, mass = 15, post_func = drop_mini_boss_loot)
+    stats = Stats(0.54, 500, ENEMY, 1.5, knockback = 0.05, mass = 15, post_func = drop_boss_loot)
     return AIEntity("Mini boss", sprite, 1000, stats = stats, follow_weight = 0.028)
 
 def spawn_ally(entity = None):
@@ -795,7 +795,7 @@ def spawn_poof(Range):
 
 def spawn_grave():
     sprite = Sprite(Vec(90, 80), image = load_image("grave.png"))
-    return Entity("Grave", sprite, size = Vec(70, 80), solid = True, max_lifetime = 10000)
+    return Entity("Grave", sprite, size = Vec(70, 80), solid = True, lifetime = 10000)
 
 def spawn_car(Range, side = False):
     if side:
@@ -807,7 +807,7 @@ def spawn_car(Range, side = False):
         
     stats = Stats(0.3, 100, NEUTRAL, damage = 15, invincible = False, mass = 500, knockback = 5, post_func = explode)
     car = Projectile("Car", sprite, Range, stats, size = Vec(90, 80), blockable = True, rotate = False)
-    car.shoot(angle)
+    #car.shoot(angle)
     return car
 
 
@@ -835,11 +835,11 @@ def drop_standard_loot(self, team):
     poof(self, team)
     loot = [None, spawn_grenade_pickup, spawn_shotgun_pickup, spawn_triple_gun_pickup, spawn_apple_pickup, spawn_ally_pickup]
     # Choose random loot item with differing weight %
-    chosen_func = random.choices(loot, [50, 10, 15, 15, 20, 10])[0]
+    chosen_func = random.choices(loot, [50, 10, 15, 15, 15, 8])[0]
     if chosen_func is not None:
         player.world.add(self.pos, chosen_func())
     
-def drop_mini_boss_loot(self, team):
+def drop_boss_loot(self, team):
     poof(self, team)
     player.world.add(self.pos, spawn_shield_pickup())
 
@@ -878,7 +878,7 @@ def debug(key, mouse_world_pos):
     if key == pygame.K_j:
         player.world.add(mouse_world_pos, spawn_enemy())
     if key == pygame.K_u:
-        player.world.add(mouse_world_pos, spawn_mini_boss())
+        player.world.add(mouse_world_pos, spawn_boss())
         
     if key == pygame.K_k:
         player.world.add(mouse_world_pos, spawn_ally())
@@ -948,10 +948,8 @@ SPRITE_PLAYER_DEAD = Sprite(Vec(65, 65), (255, 240, 0), circle = True, image = l
 
 while True:
     if __name__ == '__main__':
-        
+        time = 0
         worlds = []
-        screen_shake_timer = 0
-        screen_shake_distance = 4
         
         overworld = World("Overworld", Vec(2000, 2000), (220, 200, 140), (80, 170, 90))
         worlds.append(overworld)
@@ -962,7 +960,7 @@ while True:
         forest_world = World("Forest", Vec(2000, 2000), (13, 46, 37), (35, 75, 65))
         worlds.append(forest_world)
 
-        single_gun = WeaponItem("Single gun", spawn_bullet, 450, infinite = True, interval = 500, image = load_image("icon_standard_gun.png"))#, cooldown = 250)
+        single_gun = WeaponItem("Single gun", spawn_bullet, 450, infinite = True, interval = 500, image = load_image("icon_standard_gun.png"))
         triple_gun = WeaponItem("Triple gun", spawn_bullet, 450, repeat = 3, interval = 100, image = load_image("icon_triple_gun.png"))
         shotgun = WeaponItem("Shotgun", spawn_bullet, 250, count = 4, spread = 36, image = load_image("icon_shotgun.png"))
         grenade = WeaponItem("Grenade", spawn_grenade, 300, image = load_image("icon_grenade.png"))
@@ -1007,15 +1005,16 @@ while True:
                 pos *= 0.75
                 if y == 0 or y == 3  or x == 0 or x == 3:
                     city_world.add(pos, spawn_building())
+                    
         car_y = [-1200, -650, 550, 1150]
         for i in range(4):
             interval = random.randint(4000, 8000)
-            city_world.add_spawner(Spawner(interval, lambda x: spawn_car(2400, True), 10, Vec(-1175, car_y[i])))
+            city_world.add_spawner(Spawner(interval, lambda x: spawn_car(2500, True), 10, Vec(-1225, car_y[i])))
             
         car_x = [-1200, -625, 600, 1200]
         for i in range(4):
             interval = random.randint(4000, 8000)
-            city_world.add_spawner(Spawner(interval, lambda x: spawn_car(2400, False), 10, Vec(car_x[i], -1200)))
+            city_world.add_spawner(Spawner(interval, lambda x: spawn_car(2500, False), 10, Vec(car_x[i], -1200)))
 
         for i in range(8):
             city_world.add(city_world.rand_pos() * 0.375 - Vec(0, 35), spawn_tree())
@@ -1034,13 +1033,15 @@ while True:
         cave_world.add_spawner(Spawner(1000, spawn_copper, 3))
         cave_world.add_spawner(Spawner(1000, spawn_gold, 5))
         
-        forest_world.add_spawner(Spawner(5000, spawn_mini_boss, 1))
+        forest_world.add_spawner(Spawner(5000, spawn_boss, 1))
 
         for world in worlds:
             world.pre_render()
-            
+        delta_time = 16
         while True:
             delta_time = clock.tick(FPS) # time between each update cycle
+            time += delta_time
+            
             MOUSE_CLICKED = [False, False, False, False, False]
             events = pygame.event.get()
 
@@ -1076,12 +1077,35 @@ while True:
             if player.stats.is_alive():
                 inventory.update(MOUSE_CLICKED[0], MOUSE_SCROLL)
             player.control()
-            player.world.update()
+            #player.world.update()
+
+            world = player.world
+            for e in world.entities:
+                if e is not None:
+                    e.update()
+            for e1 in world.entities:
+                if e1 is not None:
+                    for e2 in world.entities:
+                        if e2 is not None and e1 is not e2:
+                            if e1.colliding(e2):
+                                e1.collide(e2)
+            for s in world.spawners:
+                s.update()
             
-            player.world.render(GAME_SURFACE)
+            #player.world.render(GAME_SURFACE)
+
+            GAME_SURFACE.fill(world.color_bg)
+            GAME_SURFACE.blit(world.bg_surface, screen_pos(-world.size/2).tuple())
+            
+            world.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
+            for e in world.entities:
+                e.render(GAME_SURFACE)
+
+            
             render_overlay(GAME_SURFACE)
             draw_cursor(GAME_SURFACE)
             #WINDOW.blit(pygame.transform.scale(GAME_SURFACE, WINDOW_SIZE), (0, 0))
             WINDOW.blit(GAME_SURFACE, (0, 0))
             
             pygame.display.flip()
+            
