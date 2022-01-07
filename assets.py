@@ -1,7 +1,9 @@
-from util import load_image;
+from util import load_image
 
 MAIN_FONT = "StayPuft.ttf"
 
+IMG_CURSOR_ARROW = load_image("cursor_arrow.png")
+IMG_CURSOR_TARGET = load_image("cursor_target.png")
 
 IMG_BG_CITY = load_image("bg_city.png")
 
