@@ -1,6 +1,5 @@
 import os
 import pygame
-from globals import Globals
 
 
 def clamp(value, min_val, max_val):
@@ -44,8 +43,10 @@ def load_image(name):
         images[name] = image
     return image
 
+
 def scale_image(image, scale):
     return pygame.transform.scale(image, (image.get_width() * scale, image.get_height() * scale))
+
 
 fonts = {}
 
@@ -64,3 +65,14 @@ def write(surface, text, font_name, size, pos, color, center=False):
         text_rect = pos.tuple()
     surface.blit(text, text_rect)
 
+
+def draw_meter(surface, pos, size, proportion, fg_color, bg_color, center=True):
+    if center:
+        rect = rect_center(pos, size)
+    else:
+        rect = pygame.Rect(pos.tuple(), size.tuple())
+    # pygame.draw.rect(surface, (255, 255, 255), outline_rect.inflate(4, 4))
+    pygame.draw.rect(surface, bg_color, rect)
+
+    rect.width = proportion * size.x
+    pygame.draw.rect(surface, fg_color, rect)
