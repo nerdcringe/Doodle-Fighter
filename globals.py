@@ -8,3 +8,4 @@ class Globals:
 
     FPS = 90
     debug_mode = False
+    show_overlay = True

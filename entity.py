@@ -58,16 +58,22 @@ class Entity:
     def rotate(self, angle):
         self.surface = pygame.transform.rotate(self.surface, angle)
 
-    def render(self, surface):
+    def render(self, surface, pos):
         hitbox = self.hitbox()
+        hitbox.center = pos.tuple()
         # Draw healthbar meter
-        if self.health < self.max_health and (not self.invincible and not self.is_player):
+        if self.health < self.max_health and (not self.invincible or self.is_player):
             pos = Vec(hitbox.centerx, hitbox.top - 13)
             bg_width = math.sqrt(self.max_health) * 8
+
             if self.team == ALLY:
                 fg_color = (80, 130, 255)
             else:
                 fg_color = (255, 0, 0)
+
+            if self.is_player and self.invincible:
+                fg_color = (119, 143, 155)
+
             util.draw_meter(surface, pos, Vec(bg_width, 6), self.health/self.max_health,  fg_color, (0, 0, 0))
 
         render_rect = hitbox.copy()
@@ -157,6 +163,8 @@ class AI_Entity(Entity):
         super().collide(other, world)
         if opposes(self, other) and other not in self.last_collisions:
             other.hurt(self.damage, world)
+            if other.take_knockback:
+                other.accel((other.pos - self.pos) * 0.0025)
             self.atk_timer = 0
 
     def in_range(self, other):
@@ -206,7 +214,7 @@ class AI_Entity(Entity):
 
 
 class Projectile(Entity):
-    def __init__(self, name, image, image_scale, speed, team, health, damage, direction, Range, parent=None, blockable=True, post_func=None, rotate=True):
+    def __init__(self, name, image, image_scale, speed, team, health, damage, direction, Range, parent=None, blockable=True, rotate=True, post_func=None):
         super().__init__(name, image, image_scale, speed, team, health, post_func=post_func)
         self.damage = damage
         self.vel = direction.norm() * self.speed
@@ -245,12 +253,17 @@ class Projectile(Entity):
     def collide(self, other, world):
         super().collide(other, world)
         opposed = opposes(self, other) and other not in self.last_collisions
+
         if opposed or other.solid:
             other.shake_timer = 150
             if opposed:
-                if other.take_knockback:
-                    other.accel((other.pos - self.parent.pos).norm() * 25)
-                other.hurt(self.damage, world)
+                damage = self.damage
+                if self.parent.is_player:
+                    damage *= self.parent.damage_multiplier
+                other.hurt(damage, world)
+
+            if other.take_knockback:
+                other.accel((other.pos - self.pos) * 10)
             if self.blockable:
                 if self.post_func is not None:
                     self.post_func(self, world, self.team)

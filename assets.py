@@ -14,7 +14,8 @@ IMG_PLAYER_METALSUIT = load_image("player_metalsuit.png")
 IMG_BRAWLER = load_image("brawler.png")
 IMG_BRAWLER_BOSS = load_image("brawler_boss.png")
 
-IMG_BULLET = load_image("bullet.png")
+IMG_PROJECTILE_BULLET = load_image("projectile_bullet.png")
+IMG_PROJECTILE_ARROW = load_image("projectile_arrow.png")
 IMG_POOF = load_image("poof.png")
 
 
@@ -22,9 +23,12 @@ IMG_TREE = load_image("tree.png")
 IMG_ROCK = load_image("rock.png")
 IMG_GRAVE = load_image("grave.png")
 
-IMG_SHOTGUN = load_image("powerup_shotgun.png")
-IMG_GRENADE = load_image("powerup_grenade.png")
+IMG_DMG_UP = load_image("pickup_dmg_up.png")
 IMG_APPLE = load_image("pickup_apple.png")
-IMG_SPEED_SHOES = load_image("powerup_speed.png")
-IMG_SHIELD = load_image("powerup_shield.png")
-IMG_METALSUIT = load_image("powerup_metalsuit.png")
+
+IMG_SHOTGUN = load_image("pickup_shotgun.png")
+IMG_ARROWS = load_image("pickup_arrows.png")
+IMG_GRENADE = load_image("pickup_grenade.png")
+IMG_SPEED_SHOES = load_image("pickup_speed.png")
+IMG_SHIELD = load_image("pickup_shield.png")
+IMG_METALSUIT = load_image("pickup_metalsuit.png")
