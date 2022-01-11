@@ -407,7 +407,7 @@ if __name__ == "__main__":
 
             current_world.entities.sort(key = lambda e: e.pos.y + e.size.y / 2)
             for e in current_world.entities:
-                e.render(window, screen_pos(e.pos))
+                e.render(window, screen_pos(Vec(e.hitbox().center)))
 
             if Globals.show_overlay:
                 render_overlay(window)
