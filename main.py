@@ -2,9 +2,6 @@ import sys
 import pygame
 import math
 from vector import Vec
-import util
-from entity import *
-from world import World, Spawner
 from globals import Globals
 
 
@@ -13,8 +10,9 @@ pygame.display.set_caption('lifesim')
 pygame.key.set_repeat()
 pygame.mouse.set_visible(False)
 
-window = pygame.display.set_mode(Globals.SIZE.tuple(), pygame.DOUBLEBUF)
+window = pygame.display.set_mode(Globals.SIZE.tuple(), pygame.DOUBLEBUF | pygame.RESIZABLE)
 clock = pygame.time.Clock()
+
 
 
 def screen_pos(v):
@@ -25,6 +23,13 @@ def world_pos(v):
 
 
 import assets
+from entity import *
+from world import World, Spawner
+
+
+pygame.mixer.music.set_volume(0.35)
+pygame.mixer.music.load(assets.MUSIC_OVERWORLD)
+pygame.mixer.music.play(-1)
 
 
 def new_tree():
@@ -35,10 +40,10 @@ def new_rock():
 
 
 def new_brawler():
-    return AI_Entity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 250, post_func=brawler_loot)
+    return AI_Entity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, post_func=brawler_loot)
 
 def new_brawler_boss():
-    return AI_Entity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.7, ENEMY, 75, 3, 800, 0.04, 750, take_knockback=False, size=Vec(120, 120), post_func=brawler_boss_loot)
+    return AI_Entity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.6, ENEMY, 75, 3, 2000, 0.04, 2000, take_knockback=False, size=Vec(120, 120), post_func=brawler_boss_loot)
 
 
 def new_apple_pickup():
@@ -56,6 +61,9 @@ def new_shotgun_pickup():
 
 def new_arrows_pickup():
     return Pickup("Arrows", assets.IMG_ARROWS, 0.25, lambda: gain_powerup(arrows))
+
+def new_grenade_pickup():
+    return Pickup("Grenade", assets.IMG_GRENADE, 0.25, lambda: gain_powerup(grenade))
 
 def new_speed_pickup():
     return Pickup("Sped Shoes", assets.IMG_SPEED_SHOES, 0.25, lambda: gain_powerup(speed_shoes))
@@ -84,9 +92,17 @@ def arrow_shot(world, parent, team, direction):
     arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 1, 1.5, team, None, 2, direction, 600, parent=parent, post_func=spawn_poof, blockable=False)
     world.add(parent.pos, arrow)
 
+def grenade_shot(world, parent, team, direction):
+    grenade = Projectile("Grenade", assets.IMG_GRENADE, 0.2, 1, team, None, 2, direction, 600, parent=parent,
+                       post_func=spawn_explosion, blockable=True)
+    world.add(parent.pos, grenade)
+
 
 def spawn_grave(self, world, team):
     world.add(self.pos, Entity("Grave", assets.IMG_GRAVE, 0.35, health=25, team=team, solid=True))
+
+def spawn_explosion(self, world, team):
+    world.add(self.pos, Projectile("Explosion", assets.IMG_EXPLOSION, 0.4, 0.05, team, None, 1, self.vel, 100, parent=self, blockable=False))
 
 def spawn_poof(self, world, team):
     poof = Entity("Poof", assets.IMG_POOF, 1, 0.01, NEUTRAL, lifetime=100)
@@ -189,9 +205,9 @@ class Player(Entity):
         if keys[pygame.K_s]:
             direction += Vec(0, 1)
             vertical = True
-        self.accel(direction.norm() * 0.095)
+        self.accel(direction.norm() * 0.12)
         if not (horizontal or vertical):
-            self.vel *= 0.92
+            self.vel *= 0.88
 
     def hurt(self, amount, world):
         super().hurt(amount, world)
@@ -265,8 +281,8 @@ def debug(key, mouse_world_pos):
         current_world.add(mouse_world_pos, new_speed_pickup())
     elif key == pygame.K_7:
         current_world.add(mouse_world_pos, new_metalsuit_pickup())
-    #if key == pygame.K_p:
-    #    current_world.add(mouse_world_pos, new_grenade_pickup())
+    if key == pygame.K_8:
+        current_world.add(mouse_world_pos, new_grenade_pickup())
 
     elif key == pygame.K_v:
         Globals.debug_mode = not Globals.debug_mode
@@ -289,9 +305,9 @@ if __name__ == "__main__":
     while True:
         worlds = []
 
-        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 10)
-        arrows = Powerup("Arrows", assets.IMG_ARROWS, 10)
-        grenade = Powerup("Grenade", assets.IMG_GRENADE, 5)
+        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 20000)
+        arrows = Powerup("Arrows", assets.IMG_ARROWS, 20000)
+        grenade = Powerup("Grenade", assets.IMG_GRENADE, 15000)
         speed_shoes = Powerup("Speed", assets.IMG_SPEED_SHOES, 10000)
         metalsuit = Powerup("Metalsuit", assets.IMG_METALSUIT, 10000)
 
@@ -299,15 +315,16 @@ if __name__ == "__main__":
         powerups = {
             shotgun: 0,
             arrows: 0,
+            grenade: 0,
             speed_shoes: 0,
             metalsuit: 0,
         }
 
-        overworld = World("Overworld", Vec(2500, 2500), (220, 200, 140), (85, 175, 90))
+        overworld = World("Overworld", Vec(2500, 2500), (220, 200, 140), (85, 175, 95))
         worlds.append(overworld)
         current_world = overworld
 
-        city_world = World("City", Vec(3000, 3000), (112, 250, 160), image=assets.IMG_BG_CITY)
+        city_world = World("City", Vec(3000, 3000), (105, 230, 150), image=assets.IMG_BG_CITY)
         worlds.append(city_world)
 
         player_speed = 0.65
@@ -318,8 +335,7 @@ if __name__ == "__main__":
             overworld.add(overworld.rand_pos(), new_rock())
         overworld.add_spawner(Spawner(8000, new_tree, 12, radius=1.25, pre_spawned = 12))
         overworld.add_spawner(Spawner(3000, new_brawler, 7))
-        overworld.add_spawner(Spawner(30000, new_brawler_boss, 1))
-
+        overworld.add_spawner(Spawner(45000, new_brawler_boss, 1))
 
         frames = 0
         while True:
@@ -344,18 +360,25 @@ if __name__ == "__main__":
                             if powerups[shotgun] > 0:
                                 shotgun_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
                                 default_gun = False
-                                deplete_powerup(shotgun, 1)
+                                deplete_powerup(shotgun, 1000)
 
                             if powerups[arrows] > 0:
                                 arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
                                 default_gun = False
-                                deplete_powerup(arrows, 1)
+                                deplete_powerup(arrows, 1000)
+
+                            if powerups[grenade] > 0:
+                                grenade_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                                default_gun = False
+                                deplete_powerup(grenade, 1000)
 
                             if default_gun:
                                 single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
 
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, MOUSE_WORLD_POS)
+                elif event.type == pygame.VIDEORESIZE:
+                    Globals.SIZE = Vec(event.size)
 
             if keys[pygame.K_r]:
                 break
@@ -366,7 +389,7 @@ if __name__ == "__main__":
                 if has_metalsuit:
                     player.speed = player_speed * 1.25
                 else:
-                    player.speed = player_speed * 1.5
+                    player.speed = player_speed * 1.4
                 deplete_powerup(speed_shoes, Globals.delta_time)
             else:
                 if has_metalsuit:

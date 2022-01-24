@@ -4,6 +4,7 @@ import random
 from vector import Vec
 import util
 from globals import Globals
+import assets
 
 ALLY = 0
 ENEMY = 1
@@ -161,11 +162,13 @@ class AI_Entity(Entity):
 
     def collide(self, other, world):
         super().collide(other, world)
-        if opposes(self, other) and other not in self.last_collisions:
+        """if opposes(self, other) and other not in self.last_collisions:
             other.hurt(self.damage, world)
             if other.take_knockback:
-                other.accel((other.pos - self.pos) * 0.0025)
-            self.atk_timer = 0
+                other.accel((other.pos - self.pos) * 0.01)
+                pygame.mixer.Sound.play(assets.SFX_HIT_1)
+
+            self.atk_timer = 0"""
 
     def in_range(self, other):
         return Vec.dist(self.pos, other.pos) <= self.sight_range
@@ -193,20 +196,37 @@ class AI_Entity(Entity):
         # Spread away from same team to prevent overlapping sprites
         spread = list(filter(self.can_spread, world.entities))
         for other in spread:
-            pos_diff = self.pos - other.pos
-            #scalar = 1 / (pos_diff.mag() + 0.2)  # Spread away more from closer entities
-            scalar = 1 / (pos_diff.mag() + 0.1)  # Spread away more from closer entities
-            self.accel(pos_diff.norm() * scalar)
+            dir = self.pos - other.pos
+            scalar = 1 / (dir.mag() + 0.1)  # Spread away more from closer entities
+            self.accel(dir.norm() * scalar)
 
     def update(self, world):
         follow = list(filter(self.can_follow, world.entities))
         if len(follow) > 0:
+            can_attack = self.atk_timer > self.atk_interval
             target = follow[0]
-            if not self.colliding(target) and self.atk_timer > self.atk_interval:
-                self.accel((target.pos - self.pos).norm() * self.follow_weight)
+
+            # approach player, but keep at distance until attack is charged
+
+            target_dir = target.pos - self.pos
+            attack_range = 175
+            if can_attack:
+                self.accel(target_dir.norm() * self.follow_weight)
             else:
-                self.accel((self.pos - target.pos).norm() * 0.02)
+                # Keep at a certain radius away from player
+                radius_pos = target.pos - target_dir.norm() * attack_range
+                radius_dir = radius_pos - self.pos
+                magnitude = self.vel.mag()/self.speed + 0.5
+                self.accel(radius_dir.norm() * self.follow_weight * magnitude)
             self.atk_timer += Globals.delta_time
+
+            if can_attack and self.colliding(target):
+                target.hurt(self.damage, world)
+                if target.take_knockback:
+                    target.accel((target.pos - self.pos) * 0.05)
+                    pygame.mixer.Sound.play(assets.random_hit_sfx())
+                self.atk_timer = 0
+
         else:
             self.wander(world)
         self.spread(world)

@@ -6,6 +6,6 @@ class Globals:
     delta_time = 0
     cursor_img = None
 
-    FPS = 90
+    FPS = 60
     debug_mode = False
     show_overlay = True
