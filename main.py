@@ -1,9 +1,6 @@
 import sys
 import pygame
-import math
-from vector import Vec
 from globals import Globals
-
 
 pygame.init()
 pygame.display.set_caption('lifesim')
@@ -22,14 +19,8 @@ def world_pos(v):
     return v - Globals.SIZE/2 + player.pos
 
 
-import assets
 from entity import *
 from world import World, Spawner
-
-
-pygame.mixer.music.set_volume(0.35)
-pygame.mixer.music.load(assets.MUSIC_OVERWORLD)
-pygame.mixer.music.play(-1)
 
 
 def new_tree():
@@ -40,10 +31,13 @@ def new_rock():
 
 
 def new_brawler():
-    return AI_Entity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, post_func=brawler_loot)
+    return AI_Entity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, post_func=brawler_loot)
 
 def new_brawler_boss():
-    return AI_Entity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.6, ENEMY, 75, 3, 2000, 0.04, 2000, take_knockback=False, size=Vec(120, 120), post_func=brawler_boss_loot)
+    return AI_Entity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.53, 0.6, ENEMY, 50, 3, 2000, 0.04, 2000, 225, take_knockback=False, size=Vec(120, 120), post_func=brawler_boss_loot)
+
+def new_ranger():
+    return Ranged_AI_Entity("Ranger", assets.IMG_RANGER, 0.25, 0.4, ENEMY, 6, 1, 600, 0.08, 1500, 200, weapon_func=arrow_shot, post_func=ranger_loot)
 
 
 def new_apple_pickup():
@@ -77,23 +71,27 @@ def new_bullet(parent, team, direction, Range):
     return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, 1, 1.25, team, None, 2, direction, Range, parent=parent, post_func=spawn_poof, blockable=True)
 
 def single_shot(world, parent, team, direction):
+    assets.play_sound(assets.random_shoot_sfx())
     world.add(parent.pos, new_bullet(parent, team, direction, 450))
 
 def shotgun_shot(world, parent, team, direction):
-    spread = 30
+    assets.play_sound(assets.SFX_SHOOT_SG)
+    total_spread = 24
     count = 3
-    current_angle = -spread/2
+    current_angle = -total_spread/2
     for i in range(count):
         new_direction = Vec.polar(1, current_angle - direction.angle())
         world.add(parent.pos, new_bullet(parent, team, new_direction, 250))
-        current_angle += spread / (count - 1)
+        current_angle += total_spread / (count - 1)
 
 def arrow_shot(world, parent, team, direction):
-    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 1, 1.5, team, None, 2, direction, 600, parent=parent, post_func=spawn_poof, blockable=False)
+    assets.play_sound(assets.SFX_SHOOT_ARROW)
+    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 1, 1.6, team, None, 2, direction, 650, parent=parent, post_func=spawn_poof, blockable=False)
     world.add(parent.pos, arrow)
 
 def grenade_shot(world, parent, team, direction):
-    grenade = Projectile("Grenade", assets.IMG_GRENADE, 0.2, 1, team, None, 2, direction, 600, parent=parent,
+    assets.play_sound(assets.SFX_SHOOT_GRENADE)
+    grenade = Projectile("Grenade", assets.IMG_GRENADE, 0.2, 1, team, None, 2, direction, 400, parent=parent,
                        post_func=spawn_explosion, blockable=True)
     world.add(parent.pos, grenade)
 
@@ -102,7 +100,8 @@ def spawn_grave(self, world, team):
     world.add(self.pos, Entity("Grave", assets.IMG_GRAVE, 0.35, health=25, team=team, solid=True))
 
 def spawn_explosion(self, world, team):
-    world.add(self.pos, Projectile("Explosion", assets.IMG_EXPLOSION, 0.4, 0.05, team, None, 1, self.vel, 100, parent=self, blockable=False))
+    assets.play_sound(assets.SFX_BOOM)
+    world.add(self.pos, Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.04, team, None, 3, self.vel, 100, parent=self, blockable=False))
 
 def spawn_poof(self, world, team):
     poof = Entity("Poof", assets.IMG_POOF, 1, 0.01, NEUTRAL, lifetime=100)
@@ -116,6 +115,11 @@ def tree_death(self, world, team):
         world.add(self.pos, new_apple_pickup())
 
 def brawler_loot(self, world, team):
+    if random.random() < 0.25:
+        loot = random.choice((new_shotgun_pickup, new_speed_pickup, new_arrows_pickup))
+        world.add(self.pos, loot())
+
+def ranger_loot(self, world, team):
     if random.random() < 0.25:
         loot = random.choice((new_shotgun_pickup, new_speed_pickup, new_arrows_pickup))
         world.add(self.pos, loot())
@@ -141,46 +145,6 @@ def draw_cursor(surface):
     surface.blit(cursor, rect)
 
 
-def render_overlay(surface):
-    stats = [
-        "Position: " + str(player.pos.rounded()),
-        "World: " + current_world.name,
-        "Damage Multiplier: * " + str(round(player.damage_multiplier, 1)),
-        "Health: " + str(max(0, round(player.health))) + "/" + str(max(0, round(player.max_health))),
-    ]
-
-    """for powerup in powerups:
-        if powerups[powerup] > -100:
-            stats.append(powerup.name + ": " + str(powerups[powerup]))"""
-
-    if Globals.debug_mode:
-        stats.append("# Entities: " + str(len(current_world.entities)))
-        stats.append("FPS: " + str(round(clock.get_fps(), 1)))
-
-    util.draw_meter(surface, Vec(115, Globals.SIZE.y - 35*4 - 6), Vec(200, 33), player.health/player.max_health, (80, 130, 255), (0, 0, 0), center=False)
-
-    stat_y = Globals.SIZE.y - 15  # - 35
-    for stat in stats:
-        stat_y -= 35
-        util.write(surface, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
-
-    if player.health <= 0:
-        util.write(surface, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE/2, (255, 255, 255), center=True)
-
-    x = 0
-    y = 0
-    for powerup in powerups:
-        if powerups[powerup] > 0:
-            image_pos = Vec(Globals.SIZE.x-95, 5) + (Vec(-x * 85, y * 85))
-            surface.blit(powerup.image, image_pos.tuple())
-            timer_value = min(powerups[powerup]/powerup.current_max, 1)
-            util.draw_meter(surface, image_pos+Vec(42, 100), Vec(50, 6), timer_value, (255, 255, 255), (100, 100, 100), center = True)
-            x += 1
-            if x >= 3:
-                x = 0
-                y += 1
-
-
 
 class Player(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, post_func=None, hurt_func=None):
@@ -188,6 +152,12 @@ class Player(Entity):
         self.hurt_func = hurt_func
         self.is_player = True
         self.damage_multiplier = 1
+        self.image_changed = False
+
+    def update(self, world):
+        super().update(world)
+        if self.shake_timer <= 0 and self.image_changed:
+            self.set_image(assets.IMG_PLAYER_ALIVE)
 
     def control(self, keys):
         horizontal = False
@@ -211,7 +181,11 @@ class Player(Entity):
 
     def hurt(self, amount, world):
         super().hurt(amount, world)
+        self.shake_timer = 100
         deplete_powerup(metalsuit, amount*500)
+
+        self.set_image(assets.IMG_PLAYER_OW)
+        self.image_changed = True
 
     def heal(self, amount):
         self.health += amount
@@ -265,6 +239,8 @@ def debug(key, mouse_world_pos):
         current_world.add(mouse_world_pos, new_brawler())
     elif key == pygame.K_k:
         current_world.add(mouse_world_pos, new_brawler_boss())
+    elif key == pygame.K_l:
+        current_world.add(mouse_world_pos, new_ranger())
 
     elif key == pygame.K_1:
         current_world.add(mouse_world_pos, new_apple_pickup())
@@ -300,6 +276,12 @@ def debug(key, mouse_world_pos):
         set_world(worlds[index])
 
 
+def set_sound(on):
+    if on:
+        pass#pygame.mixer.music.play(-1)
+    else:
+        pygame.mixer.music.pause()
+
 
 if __name__ == "__main__":
     while True:
@@ -334,10 +316,17 @@ if __name__ == "__main__":
         for i in range(15):
             overworld.add(overworld.rand_pos(), new_rock())
         overworld.add_spawner(Spawner(8000, new_tree, 12, radius=1.25, pre_spawned = 12))
-        overworld.add_spawner(Spawner(3000, new_brawler, 7))
+        overworld.add_spawner(Spawner(3000, new_brawler, 5))
+        overworld.add_spawner(Spawner(8000, new_ranger, 3))
         overworld.add_spawner(Spawner(45000, new_brawler_boss, 1))
 
         frames = 0
+
+        pygame.mixer.music.set_volume(0.35)
+        pygame.mixer.music.load(assets.MUSIC_OVERWORLD)
+        
+        set_sound(False)
+
         while True:
             frames += 1
             Globals.delta_time = clock.tick(Globals.FPS)
@@ -353,35 +342,45 @@ if __name__ == "__main__":
                     sys.exit()
 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if player.health > 0:
+                    if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
+                        Globals.sound_on = not Globals.sound_on
+
+                    elif player.health > 0:
                         if event.button == 1:
                             default_gun = True
 
                             if powerups[shotgun] > 0:
                                 shotgun_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
                                 default_gun = False
-                                deplete_powerup(shotgun, 1000)
+                                deplete_powerup(shotgun, 750)
 
                             if powerups[arrows] > 0:
                                 arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
                                 default_gun = False
-                                deplete_powerup(arrows, 1000)
+                                deplete_powerup(arrows, 750)
 
                             if powerups[grenade] > 0:
                                 grenade_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
                                 default_gun = False
-                                deplete_powerup(grenade, 1000)
+                                deplete_powerup(grenade, 750)
 
                             if default_gun:
                                 single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
 
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, MOUSE_WORLD_POS)
+                    if event.key == pygame.K_m:
+                        Globals.sound_on = not Globals.sound_on
+                        set_sound(Globals.sound_on)
                 elif event.type == pygame.VIDEORESIZE:
                     Globals.SIZE = Vec(event.size)
 
             if keys[pygame.K_r]:
                 break
+
+            deplete_powerup(shotgun, Globals.delta_time)
+            deplete_powerup(grenade, Globals.delta_time)
+            deplete_powerup(arrows, Globals.delta_time)
 
             has_metalsuit = powerups[metalsuit] > 0
 
@@ -433,7 +432,54 @@ if __name__ == "__main__":
                 e.render(window, screen_pos(Vec(e.hitbox().center)))
 
             if Globals.show_overlay:
-                render_overlay(window)
+                stats = [
+                    "Position: " + str(player.pos.rounded()),
+                    "World: " + current_world.name,
+                    "Damage Multiplier: * " + str(round(player.damage_multiplier, 1)),
+                    "Health: " + str(max(0, round(player.health))) + "/" + str(max(0, round(player.max_health))),
+                ]
+
+                """for powerup in powerups:
+                    if powerups[powerup] > -100:
+                        stats.append(powerup.name + ": " + str(powerups[powerup]))"""
+
+                if Globals.debug_mode:
+                    stats.append("# Entities: " + str(len(current_world.entities)))
+                    stats.append("FPS: " + str(round(clock.get_fps(), 1)))
+
+                util.draw_meter(window, Vec(115, Globals.SIZE.y - 35 * 4 - 6), Vec(200, 33),
+                                player.health / player.max_health, (80, 130, 255), (0, 0, 0), center=False)
+
+                stat_y = Globals.SIZE.y - 15  # - 35
+                for stat in stats:
+                    stat_y -= 35
+                    util.write(window, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
+
+                if player.health <= 0:
+                    util.write(window, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE / 2, (255, 255, 255),
+                               center=True)
+                x = 0
+                y = 0
+                for powerup in powerups:
+                    if powerups[powerup] > 0:
+                        image_pos = Vec(Globals.SIZE.x - 95, 5) + (Vec(-x * 85, y * 85))
+                        window.blit(powerup.image, image_pos.tuple())
+                        timer_value = min(powerups[powerup] / powerup.current_max, 1)
+                        util.draw_meter(window, image_pos + Vec(42, 100), Vec(50, 6), timer_value, (255, 255, 255),
+                                        (100, 100, 100), center=True)
+                        x += 1
+                        if x >= 3:
+                            x = 0
+                            y += 1
+
+            sound_icon = None
+            if Globals.sound_on:
+               sound_icon = assets.IMG_SOUND_ON
+            else:
+               sound_icon = assets.IMG_SOUND_OFF
+            window.blit(sound_icon, (0, 0))
+
+
             draw_cursor(window)
 
             pygame.display.flip()

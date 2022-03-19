@@ -83,9 +83,10 @@ class Entity:
         render_rect.y += (self.size.y - self.image_size.y) / 2
 
         if self.shake_timer > 0:
-            dist = 2
-            render_rect.x += random.randint(-dist, dist)
-            render_rect.y += random.randint(-dist, dist)
+            dist = 3
+            if not self.is_player:
+                render_rect.x += random.randint(-dist, dist)
+                render_rect.y += random.randint(-dist, dist)
             self.shake_timer -= Globals.delta_time
 
         surface.blit(self.surface, render_rect)
@@ -131,8 +132,6 @@ class Entity:
             self.health -= amount
             self.health = max(0, self.health)
             self.shake_timer = 200
-        elif self.is_player:
-            self.shake_timer = 50
         if self.health <= 0 and alive:
             if self.post_func is not None:
                 self.post_func(self, world, self.team)
@@ -151,13 +150,15 @@ def opposes(self, other):
 
 
 class AI_Entity(Entity):
-    def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, post_func=None, size=None, take_knockback=True):
+    def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
+            post_func=None, size=None, take_knockback=True):
         super().__init__(name, image, image_scale, speed, team, health, post_func, size, take_knockback=take_knockback)
         self.damage = damage
         self.sight_range = sight_range
         self.follow_weight = follow_weight
         self.atk_interval = atk_interval
         self.atk_timer = self.atk_interval
+        self.retreat_range = retreat_range
         self.wandering = False
 
     def collide(self, other, world):
@@ -200,37 +201,64 @@ class AI_Entity(Entity):
             scalar = 1 / (dir.mag() + 0.1)  # Spread away more from closer entities
             self.accel(dir.norm() * scalar)
 
+    def attack(self, target_direction, world):
+        self.accel(target_direction.norm() * self.follow_weight)
+
+    def retreat(self, target, target_direction):
+        # Keep at a certain radius target_direction from player
+        radius_pos = target.pos - target_direction.norm() * self.retreat_range
+        radius_dir = radius_pos - self.pos
+        magnitude = self.vel.mag() / self.speed + 0.5
+        self.accel(radius_dir.norm() * self.follow_weight * magnitude)
+        self.atk_timer += Globals.delta_time
+
+
     def update(self, world):
         follow = list(filter(self.can_follow, world.entities))
         if len(follow) > 0:
-            can_attack = self.atk_timer > self.atk_interval
             target = follow[0]
 
             # approach player, but keep at distance until attack is charged
-
             target_dir = target.pos - self.pos
             attack_range = 175
-            if can_attack:
-                self.accel(target_dir.norm() * self.follow_weight)
-            else:
-                # Keep at a certain radius away from player
-                radius_pos = target.pos - target_dir.norm() * attack_range
-                radius_dir = radius_pos - self.pos
-                magnitude = self.vel.mag()/self.speed + 0.5
-                self.accel(radius_dir.norm() * self.follow_weight * magnitude)
-            self.atk_timer += Globals.delta_time
 
-            if can_attack and self.colliding(target):
-                target.hurt(self.damage, world)
-                if target.take_knockback:
-                    target.accel((target.pos - self.pos) * 0.05)
-                    pygame.mixer.Sound.play(assets.random_hit_sfx())
-                self.atk_timer = 0
+            if self.atk_timer > self.atk_interval:
+                self.attack(target_dir, world)
+
+                if self.colliding(target):
+                    target.hurt(self.damage, world)
+                    if target.take_knockback:
+                        target.accel((target.pos - self.pos) * 0.05)
+                        #pygame.mixer.Sound.play(assets.random_hit_sfx())
+                        assets.play_sound(assets.random_hit_sfx())
+                    self.atk_timer = 0
+            else:
+                self.retreat(target, target_dir)
 
         else:
             self.wander(world)
         self.spread(world)
         super().update(world)
+
+
+class Ranged_AI_Entity(AI_Entity):
+    def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range, weapon_func,
+                 post_func=None, size=None, take_knockback=True):
+        super().__init__(name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
+                         post_func=post_func, size=size, take_knockback=take_knockback)
+        self.weapon_func = weapon_func
+
+    def attack(self, target_direction, world):
+        self.weapon_func(world, self, self.team, target_direction)
+        self.atk_timer = 0
+
+    def retreat(self, target, target_direction):
+        # Keep at a certain radius target_direction from player
+        radius_pos = target.pos - target_direction.norm() * self.retreat_range
+        radius_dir = radius_pos - self.pos
+        magnitude = self.vel.mag() / self.speed + 0.5
+        self.accel(radius_dir.norm() * self.follow_weight * magnitude)
+        self.atk_timer += Globals.delta_time
 
 
 class Projectile(Entity):
@@ -280,6 +308,8 @@ class Projectile(Entity):
                 damage = self.damage
                 if self.parent.is_player:
                     damage *= self.parent.damage_multiplier
+                if other.is_player:
+                    assets.play_sound(assets.SFX_OW_PLAYER)
                 other.hurt(damage, world)
 
             if other.take_knockback:

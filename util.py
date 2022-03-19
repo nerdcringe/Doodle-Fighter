@@ -1,6 +1,4 @@
-import os
 import pygame
-import assets
 
 
 def clamp(value, min_val, max_val):
@@ -34,13 +32,14 @@ def scale_image(image, scale):
 
 
 
+fonts = {}
 
 def write(surface, text, font_name, size, pos, color, center=False):
-    if size in assets.fonts:
-        Font = assets.fonts[size]
+    if size in fonts:
+        Font = fonts[size]
     else:
         Font = pygame.font.Font(font_name, size)
-        assets.fonts[size] = Font
+        fonts[size] = Font
 
     text = Font.render(text, 1, color)
 
