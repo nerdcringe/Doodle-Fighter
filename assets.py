@@ -65,8 +65,8 @@ def play_sound(sound):
         pygame.mixer.Sound.play(sound)
 
 
-IMG_CURSOR_ARROW = load_image("cursor_arrow.png")
-IMG_CURSOR_TARGET = load_image("cursor_target.png")
+IMG_CURSOR_ARROW = load_image("ui_cursor_arrow.png")
+IMG_CURSOR_TARGET = load_image("ui_cursor_target.png")
 IMG_SOUND_ON = util.scale_image(load_image("ui_sound_on.png"), 0.4)
 IMG_SOUND_OFF = util.scale_image(load_image("ui_sound_off.png"), 0.4)
 
@@ -77,11 +77,15 @@ IMG_PLAYER_ALIVE = load_image("player_alive.png")
 IMG_PLAYER_DEAD = load_image("player_dead.png")
 IMG_PLAYER_OW = load_image("player_ow.png")
 IMG_PLAYER_METALSUIT = load_image("player_metalsuit.png")
+IMG_PLAYER_INVIS = load_image("player_invis.png")
 
 IMG_BRAWLER = load_image("brawler.png")
 IMG_BRAWLER_BOSS = load_image("brawler_boss.png")
 IMG_RANGER = load_image("ranger.png")
 IMG_BOOMER = load_image("boomer.png")
+IMG_CAR_FRONT = load_image("car_front.png")
+IMG_CAR_SIDE = load_image("car_side.png")
+IMG_ALLY = load_image("ally.png")
 
 IMG_PROJECTILE_BULLET = load_image("projectile_bullet.png")
 IMG_PROJECTILE_ARROW = load_image("projectile_arrow.png")
@@ -90,6 +94,7 @@ IMG_EXPLOSION = load_image("explosion.png")
 
 
 IMG_TREE = load_image("tree.png")
+IMG_TREE_CITY = load_image("tree_city.png")
 IMG_TREE_WINTER = load_image("tree_winter.png")
 IMG_ROCK = load_image("rock.png")
 
@@ -98,13 +103,12 @@ IMG_BUILDING = load_image("building.png")
 IMG_HOUSE = load_image("house.png")
 IMG_NEXT_SIGN = load_image("next.png")
 
-
-IMG_DMG_UP = load_image("pickup_dmg_up.png")
-IMG_APPLE = load_image("pickup_apple.png")
-
-IMG_SHOTGUN = load_image("pickup_shotgun.png")
-IMG_ARROWS = load_image("pickup_arrows.png")
-IMG_GRENADE = load_image("pickup_grenade.png")
-IMG_SPEED_SHOES = load_image("pickup_speed.png")
-IMG_SHIELD = load_image("pickup_shield.png")
-IMG_METALSUIT = load_image("pickup_metalsuit.png")
+IMG_DMG_UP = load_image("item_dmg_up.png")
+IMG_APPLE = load_image("item_apple.png")
+IMG_SHOTGUN = load_image("item_shotgun.png")
+IMG_ARROWS = load_image("item_arrows.png")
+IMG_GRENADE = load_image("item_grenade.png")
+IMG_SPEED_SHOES = load_image("item_speed.png")
+IMG_SHIELD = load_image("item_shield.png")
+IMG_METALSUIT = load_image("item_metalsuit.png")
+IMG_ALLY_DELIVERY = load_image("item_ally_delivery.png")

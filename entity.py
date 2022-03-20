@@ -12,8 +12,11 @@ NEUTRAL = 2
 
 
 class Entity:
-    def __init__(self, name, image, image_scale=1, speed=0, team=NEUTRAL, health=None, post_func=None, hitbox_size=None, solid=False):
+    def __init__(self, name, image, image_scale=1, speed=0, team=NEUTRAL, health=None, post_func=None, hitbox_size=None,
+                 solid=False):
         self.name = name
+        self.default_image = image
+        self.current_image = image
         self.image_scale = image_scale
         self.speed = speed
         self.team = team
@@ -27,14 +30,14 @@ class Entity:
         self.max_health = self.health
         self.post_func = post_func
         self.solid = solid
-        self.lifetime = -1 # By default -1 means not maximum lifespan
+        self.lifetime = -1  # By default -1 means not maximum lifespan
         self.take_knockback = False
 
         self.pos = Vec(0, 0)
         self.vel = Vec(0, 0)
         self.last_collisions = set([])
-        self.time = 0 # Total time alive in world
-        self.shake_timer = 0 # Timer to track how long to shake sprite
+        self.time = 0  # Total time alive in world
+        self.shake_timer = 0  # Timer to track how long to shake sprite
         self.is_player = False
 
         default_image_size = (Vec(image.get_size()) * image_scale).tuple()
@@ -51,7 +54,7 @@ class Entity:
         self.set_image(image)
 
     def set_image(self, image):
-        self.image = image
+        self.current_image = image
         self.image_size = Vec(image.get_size()) * self.image_scale
         self.surface.fill((0, 0, 0, 0))
         self.surface.blit(util.scale_image(image, self.image_scale), (0, 0))
@@ -70,17 +73,17 @@ class Entity:
 
         if self.shake_timer > 0:
             dist = 3
-            if not self.is_player:
+            if True:  # not self.is_player:
                 render_rect.x += random.randint(-dist, dist)
                 render_rect.y += random.randint(-dist, dist)
             self.shake_timer -= Globals.delta_time
 
         surface.blit(self.surface, render_rect)
-        # Draw healthbar meter
+        # Draw healthbar
         if self.is_player or not self.invincible:
             if self.health < self.max_health:
                 pos = Vec(hitbox.centerx, render_rect.top - 13)
-                bg_width = math.sqrt(self.max_health) * 9z
+                bg_width = math.sqrt(self.max_health) * 9
 
                 if self.team == ALLY:
                     fg_color = (80, 130, 255)
@@ -90,7 +93,7 @@ class Entity:
                 if self.is_player and self.invincible:
                     fg_color = (119, 143, 155)
 
-                util.draw_meter(surface, pos, Vec(bg_width, 6), self.health/self.max_health,  fg_color, (0, 0, 0))
+                util.draw_bar(surface, pos, Vec(bg_width, 6), self.health / self.max_health, fg_color, (0, 0, 0))
 
         if Globals.debug_mode:
             pygame.draw.rect(surface, (255, 255, 255), hitbox)
@@ -114,13 +117,13 @@ class Entity:
 
     def collide(self, other, world):
         if self.solid and not other.solid and not isinstance(other, Projectile):
-            bottom = self.pos.y + self.size.y/2
-            other_bottom = other.pos.y + other.size.y/2
+            bottom = self.pos.y + self.size.y / 2
+            other_bottom = other.pos.y + other.size.y / 2
             # Keep base of other entity either above or below base of this entity
             if other_bottom < bottom - 0:
-                other.pos.y = min(other_bottom + 20, bottom) - other.size.y/2 - 20
+                other.pos.y = min(other_bottom + 20, bottom) - other.size.y / 2 - 20
             else:
-                other.pos.y = max(other_bottom - 20, bottom) - other.size.y/2 + 20
+                other.pos.y = max(other_bottom - 20, bottom) - other.size.y / 2 + 20
 
     def accel(self, v):
         self.vel += v
@@ -143,17 +146,16 @@ class Entity:
         return "{name} at {pos}".format(name=self.name, pos=self.pos)
 
 
-
 def opposes(self, other):
     return ((self.team == ALLY and other.team == ENEMY) \
-        or (self.team == ENEMY and other.team == ALLY) \
-        or (self.team == ALLY and other.team == NEUTRAL)) \
-        and (not other.invincible or other.is_player)
+            or (self.team == ENEMY and other.team == ALLY) \
+            or (self.team == ALLY and other.team == NEUTRAL)) \
+            and (not other.invincible or other.is_player)
 
 
 class AIEntity(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
-                 post_func=None, hitbox_size=None):
+                 post_func=None, hitbox_size=None, side_image=None):
         super().__init__(name, image, image_scale, speed, team, health, post_func, hitbox_size)
         self.damage = damage
         self.sight_range = sight_range
@@ -161,7 +163,26 @@ class AIEntity(Entity):
         self.atk_interval = atk_interval
         self.atk_timer = self.atk_interval
         self.retreat_range = retreat_range
+        if side_image is not None:
+            self.right_image = side_image
+            self.left_image = pygame.transform.flip(side_image, True, False)
+        else:
+            self.right_image = None
+            self.left_image = None
+
         self.wandering = False
+
+    def render(self, surface, pos):
+        if self.right_image is not None:
+            if abs(self.vel.x) > abs(self.vel.y):
+                if self.vel.x > 0:
+                    self.set_image(self.right_image)
+                else:
+                    self.set_image(self.left_image)
+            else:
+                self.set_image(self.default_image)
+
+        super().render(surface, pos)
 
     def collide(self, other, world):
         super().collide(other, world)
@@ -177,7 +198,10 @@ class AIEntity(Entity):
         return Vec.dist(self.pos, other.pos) <= self.sight_range
 
     def can_follow(self, other):
-        return opposes(self, other) and self.in_range(other)
+        if other.is_player:
+            if other.current_image == assets.IMG_PLAYER_INVIS:
+                return False
+        return opposes(self, other) and self.in_range(other) and not (self.team == ALLY and other.team == NEUTRAL)
 
     def can_spread(self, other):
         return self is not other and self.team is other.team and other.health > 0 and self.in_range(other)
@@ -192,7 +216,7 @@ class AIEntity(Entity):
         else:
             self.vel *= 0.95
         # Slightly gravitate towards center of world
-        center_dist = (world.size/2) - self.pos
+        center_dist = (world.size / 2) - self.pos
         self.accel(center_dist.norm() * (center_dist.mag() * 0.00001))
 
     def spread(self, world):
@@ -214,7 +238,6 @@ class AIEntity(Entity):
         self.accel(radius_dir.norm() * self.follow_weight * magnitude)
         self.atk_timer += Globals.delta_time
 
-
     def update(self, world):
         follow = list(filter(self.can_follow, world.entities))
         if len(follow) > 0:
@@ -222,7 +245,6 @@ class AIEntity(Entity):
 
             # approach player, but keep at distance until attack is charged
             target_dir = target.pos - self.pos
-            attack_range = 175
 
             if self.atk_timer > self.atk_interval:
                 self.attack(target_dir, world)
@@ -231,22 +253,25 @@ class AIEntity(Entity):
                     target.hurt(self.damage, world)
                     if target.take_knockback:
                         target.accel((target.pos - self.pos) * 0.05)
-                        #pygame.mixer.Sound.play(assets.random_hit_sfx())
+                        # pygame.mixer.Sound.play(assets.random_hit_sfx())
                         assets.play_sound(assets.random_hit_sfx())
                     self.atk_timer = 0
             else:
                 self.retreat(target, target_dir)
 
         else:
+            self.atk_timer = self.atk_interval
             self.wander(world)
         self.spread(world)
         super().update(world)
 
 
 class RangedAIEntity(AIEntity):
-    def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range, weapon_func,
+    def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval,
+                 retreat_range, weapon_func,
                  post_func=None, hitbox_size=None):
-        super().__init__(name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
+        super().__init__(name, image, image_scale, speed, team, health, damage, sight_range, follow_weight,
+                         atk_interval, retreat_range,
                          post_func=post_func, hitbox_size=hitbox_size)
         self.weapon_func = weapon_func
 
@@ -264,7 +289,8 @@ class RangedAIEntity(AIEntity):
 
 
 class Projectile(Entity):
-    def __init__(self, name, image, image_scale, speed, team, health, damage, direction, Range, parent=None, blockable=True, rotate=True, post_func=None):
+    def __init__(self, name, image, image_scale, speed, team, health, damage, direction, Range, parent=None,
+                 blockable=True, rotate=True, post_func=None):
         super().__init__(name, image, image_scale, speed, team, health, post_func=post_func)
         self.damage = damage
         self.vel = direction.norm() * self.speed
@@ -288,12 +314,12 @@ class Projectile(Entity):
         self.distance += abs(relative_vel.mag() * Globals.delta_time)
 
         # hits border if within "radius" length.
-        ground_size = world.size/2
+        ground_size = world.size / 2
         x, y = self.pos.x, self.pos.y
         w, h = self.size.x, self.size.y
         # wall_dist > 0 when outer edge of sprite is outside world border
-        hits_border = x-w/2 <= 0 or y-h/2 <= 0 \
-                    or x+w/2 >= world.size.x or y+h/2 >= world.size.y
+        hits_border = x - w / 2 <= 0 or y - h / 2 <= 0 \
+                      or x + w / 2 >= world.size.x or y + h / 2 >= world.size.y
 
         if self.distance > self.range or hits_border and self.time > 0:
             if self.post_func is not None:
@@ -312,8 +338,8 @@ class Projectile(Entity):
                     damage *= self.parent.damage_multiplier
                 if other.is_player:
                     assets.play_sound(assets.SFX_OW_PLAYER)
-                    if other.has_metalsuit:
-                        self.distance = self.range + 1 # remove from world
+                    if other.invincible:
+                        self.distance = self.range + 1  # remove from world
                 other.hurt(damage, world)
 
             if other.take_knockback:
@@ -324,7 +350,7 @@ class Projectile(Entity):
                 world.remove(self)
 
 
-class Pickup(Entity):
+class Item(Entity):
     def __init__(self, name, image, image_scale, collide_func, condition=None):
         super().__init__(name, image, image_scale)
         self.collide_func = collide_func

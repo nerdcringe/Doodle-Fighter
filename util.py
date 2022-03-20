@@ -50,7 +50,7 @@ def write(surface, text, font_name, size, pos, color, center=False):
     surface.blit(text, text_rect)
 
 
-def draw_meter(surface, pos, size, proportion, fg_color, bg_color, center=True):
+def draw_bar(surface, pos, size, proportion, fg_color, bg_color, center=True):
     if center:
         rect = rect_center(pos, size)
     else:
