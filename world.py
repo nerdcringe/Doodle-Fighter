@@ -24,6 +24,7 @@ class World:
 
         self.entities = []
         self.spawners = []
+        self.completed = False
 
     def render(self, surface, pos):
         surface.blit(self.bg_surface, pos.tuple())
@@ -50,12 +51,12 @@ class World:
 
 
 class Spawner:
-    def __init__(self, interval, spawn_func, max_num, dest=None, radius=1, pre_spawned=0):
+    def __init__(self, interval, spawn_func, max_num, dest=None, center_spread=1, pre_spawned=0):
         self.interval = interval
         self.spawn_func = spawn_func
         self.max_num = max_num
         self.dest = dest  # Specific position to spawn in world
-        self.radius = radius  # Multiplier for position (< 1 is towards center, > 1 is towards edges)
+        self.radius = center_spread  # Multiplier for position (< 1 is towards center, > 1 is towards edges)
         self.pre_spawned = pre_spawned  # How many to spawn at first
 
         self.time = 0

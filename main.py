@@ -24,20 +24,35 @@ from world import World, Spawner
 
 
 def new_tree():
-    return Entity("Tree", assets.IMG_TREE, 0.675, health=25, solid=True, size=Vec(50, 165), post_func=tree_death)
+    return Entity("Tree", assets.IMG_TREE, 0.675, health=25, solid=True, hitbox_size=Vec(50, 165), post_func=tree_death)
+
+def new_winter_tree():
+    return Entity("Winter Tree", assets.IMG_TREE_WINTER, 0.675, health=25, solid=True, hitbox_size=Vec(30, 320), post_func=tree_death)
+
 
 def new_rock():
-    return Entity("Rock", assets.IMG_ROCK, 1, solid=True, size=Vec(85, 50))
+    return Entity("Rock", assets.IMG_ROCK, 1, solid=True, hitbox_size=Vec(85, 50))
+
+
+def new_building():
+    return Entity("Building", assets.IMG_BUILDING, 1, health=10, hitbox_size = Vec(125, 160), solid=True)
 
 
 def new_brawler():
-    return AI_Entity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, post_func=brawler_loot)
+    return AIEntity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, post_func=brawler_loot)
 
 def new_brawler_boss():
-    return AI_Entity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.53, 0.6, ENEMY, 50, 3, 2000, 0.04, 2000, 225, take_knockback=False, size=Vec(120, 120), post_func=brawler_boss_loot)
+    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.53, 0.6, ENEMY, 50, 3, 2000, 0.04, 2000, 225, hitbox_size=Vec(128, 128), post_func=brawler_boss_loot)
+    boss.take_knockback = False
+    return boss
 
 def new_ranger():
-    return Ranged_AI_Entity("Ranger", assets.IMG_RANGER, 0.25, 0.4, ENEMY, 6, 1, 600, 0.08, 1500, 200, weapon_func=arrow_shot, post_func=ranger_loot)
+    return RangedAIEntity("Ranger", assets.IMG_RANGER, 0.25, 0.4, ENEMY, 4, 1, 700, 0.08, 1500, 350,
+                          weapon_func=arrow_shot, post_func=ranger_loot, hitbox_size=Vec(64, 64))
+
+def new_boomer():
+    return RangedAIEntity("Ranger", assets.IMG_BOOMER, 0.3, 0.25, ENEMY, 10, 1, 400, 0.05, 3000, 250,
+                          weapon_func=grenade_shot, post_func=ranger_loot, hitbox_size=Vec(70, 70))
 
 
 def new_apple_pickup():
@@ -86,7 +101,7 @@ def shotgun_shot(world, parent, team, direction):
 
 def arrow_shot(world, parent, team, direction):
     assets.play_sound(assets.SFX_SHOOT_ARROW)
-    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 1, 1.6, team, None, 2, direction, 650, parent=parent, post_func=spawn_poof, blockable=False)
+    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.8, 1.8, team, None, 2, direction, 650, parent=parent, post_func=spawn_poof, blockable=False)
     world.add(parent.pos, arrow)
 
 def grenade_shot(world, parent, team, direction):
@@ -104,7 +119,8 @@ def spawn_explosion(self, world, team):
     world.add(self.pos, Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.04, team, None, 3, self.vel, 100, parent=self, blockable=False))
 
 def spawn_poof(self, world, team):
-    poof = Entity("Poof", assets.IMG_POOF, 1, 0.01, NEUTRAL, lifetime=100)
+    poof = Entity("Poof", assets.IMG_POOF, 1, 0.01, NEUTRAL)
+    poof.lifetime = 100
     poof.rotate(random.randint(0, 360))
     world.add(self.pos, poof)
     #world.add(self.pos, Projectile("Poof", assets.IMG_POOF, 0.25, 0.75, NEUTRAL, None, 0, self.vel, 20, blockable=False, parent=self, rotate=False))
@@ -152,12 +168,14 @@ class Player(Entity):
         self.hurt_func = hurt_func
         self.is_player = True
         self.damage_multiplier = 1
-        self.image_changed = False
+        self.ow_image = False
+        self.has_metalsuit = False
 
     def update(self, world):
         super().update(world)
-        if self.shake_timer <= 0 and self.image_changed:
+        if self.shake_timer <= 0 and self.ow_image:
             self.set_image(assets.IMG_PLAYER_ALIVE)
+            self.ow_image = False
 
     def control(self, keys):
         horizontal = False
@@ -181,11 +199,12 @@ class Player(Entity):
 
     def hurt(self, amount, world):
         super().hurt(amount, world)
-        self.shake_timer = 100
+        self.shake_timer = 150
         deplete_powerup(metalsuit, amount*500)
 
-        self.set_image(assets.IMG_PLAYER_OW)
-        self.image_changed = True
+        if not self.has_metalsuit:
+            self.set_image(assets.IMG_PLAYER_OW)
+            self.ow_image = True
 
     def heal(self, amount):
         self.health += amount
@@ -241,6 +260,8 @@ def debug(key, mouse_world_pos):
         current_world.add(mouse_world_pos, new_brawler_boss())
     elif key == pygame.K_l:
         current_world.add(mouse_world_pos, new_ranger())
+    elif key == pygame.K_SEMICOLON:
+        current_world.add(mouse_world_pos, new_boomer())
 
     elif key == pygame.K_1:
         current_world.add(mouse_world_pos, new_apple_pickup())
@@ -285,7 +306,12 @@ def set_sound(on):
 
 if __name__ == "__main__":
     while True:
-        worlds = []
+        frames = 0
+
+        pygame.mixer.music.set_volume(0.35)
+        pygame.mixer.music.load(assets.MUSIC_OVERWORLD)
+        set_sound(False)
+
 
         shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 20000)
         arrows = Powerup("Arrows", assets.IMG_ARROWS, 20000)
@@ -302,30 +328,44 @@ if __name__ == "__main__":
             metalsuit: 0,
         }
 
+
+        worlds = []
         overworld = World("Overworld", Vec(2500, 2500), (220, 200, 140), (85, 175, 95))
         worlds.append(overworld)
         current_world = overworld
 
-        city_world = World("City", Vec(3000, 3000), (105, 230, 150), image=assets.IMG_BG_CITY)
+        city_world = World("Cityworld", Vec(3000, 3000), (105, 210, 150), (175, 175, 175))#image=assets.IMG_BG_CITY)
         worlds.append(city_world)
 
+        forest_world = World("Forestworld", Vec(2250, 2250), (13, 46, 37), (35, 75, 65))
+        #forest_world = World("Forestworld", Vec(2000, 2000), (30, 34, 41), (56, 70, 94))
+        worlds.append(forest_world)
+
+        #house_world = World("HouseWorld", Vec(800, 800), (201, 156, 40), (217, 191, 124))
+        #worlds.append(house_world)
+
+
         player_speed = 0.65
-        player = Player("Player", assets.IMG_PLAYER_ALIVE, 0.275, player_speed, ALLY, 20, post_func=spawn_grave)
+        player = Player("Player", assets.IMG_PLAYER_ALIVE, 0.28, player_speed, ALLY, 20, post_func=spawn_grave)
         overworld.add(overworld.size/2, player)
 
+
+        overworld.add(Vec(500, 500), Entity("House", assets.IMG_HOUSE, 0.8, solid=True))
         for i in range(15):
             overworld.add(overworld.rand_pos(), new_rock())
-        overworld.add_spawner(Spawner(8000, new_tree, 12, radius=1.25, pre_spawned = 12))
-        overworld.add_spawner(Spawner(3000, new_brawler, 5))
-        overworld.add_spawner(Spawner(8000, new_ranger, 3))
-        overworld.add_spawner(Spawner(45000, new_brawler_boss, 1))
+        overworld.add_spawner(Spawner(8000, new_tree, max_num=12, center_spread=1.25, pre_spawned=12))
+        overworld.add_spawner(Spawner(4000, new_brawler, max_num=5))
+        #overworld.add_spawner(Spawner(10000, new_ranger, max_num=3))
+        overworld.add_spawner(Spawner(45000, new_brawler_boss, max_num=1))
 
-        frames = 0
+        city_world.add_spawner(Spawner(0, new_building, max_num=12, center_spread=1, pre_spawned=12))
 
-        pygame.mixer.music.set_volume(0.35)
-        pygame.mixer.music.load(assets.MUSIC_OVERWORLD)
-        
-        set_sound(False)
+
+        for i in range(8):
+            forest_world.add(forest_world.rand_pos(), new_rock())
+        #forest_world.add_spawner(Spawner(7000, new_ranger, max_num=4, pre_spawned=2))
+        forest_world.add_spawner(Spawner(5000, new_winter_tree, max_num=5, pre_spawned=20))
+
 
         while True:
             frames += 1
@@ -372,31 +412,36 @@ if __name__ == "__main__":
                     if event.key == pygame.K_m:
                         Globals.sound_on = not Globals.sound_on
                         set_sound(Globals.sound_on)
+                    """if event.key == pygame.K_e:
+                        for entity in player.last_collisions:
+                            if entity.name == "House":
+                                set_world(house_world)"""
                 elif event.type == pygame.VIDEORESIZE:
                     Globals.SIZE = Vec(event.size)
 
             if keys[pygame.K_r]:
                 break
 
+
             deplete_powerup(shotgun, Globals.delta_time)
             deplete_powerup(grenade, Globals.delta_time)
             deplete_powerup(arrows, Globals.delta_time)
 
-            has_metalsuit = powerups[metalsuit] > 0
+            player.has_metalsuit = powerups[metalsuit] > 0
 
             if powerups[speed_shoes] > 0:
-                if has_metalsuit:
+                if player.has_metalsuit:
                     player.speed = player_speed * 1.25
                 else:
                     player.speed = player_speed * 1.4
                 deplete_powerup(speed_shoes, Globals.delta_time)
             else:
-                if has_metalsuit:
+                if player.has_metalsuit:
                     player.speed = player_speed * 0.8
                 else:
                     player.speed = player_speed
 
-            if has_metalsuit:
+            if player.has_metalsuit:
                 if player.image is assets.IMG_PLAYER_ALIVE:
                     player.set_image(assets.IMG_PLAYER_METALSUIT)
                 player.invincible = True
@@ -456,7 +501,7 @@ if __name__ == "__main__":
                     util.write(window, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
 
                 if player.health <= 0:
-                    util.write(window, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE / 2, (255, 255, 255),
+                    util.write(window, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE / 2 + Vec(0, 100), (255, 255, 255),
                                center=True)
                 x = 0
                 y = 0

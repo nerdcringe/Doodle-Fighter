@@ -12,7 +12,7 @@ NEUTRAL = 2
 
 
 class Entity:
-    def __init__(self, name, image, image_scale=1, speed=0, team=NEUTRAL, health=None, post_func=None, size=None, solid=False, take_knockback=True, lifetime =-1):
+    def __init__(self, name, image, image_scale=1, speed=0, team=NEUTRAL, health=None, post_func=None, hitbox_size=None, solid=False):
         self.name = name
         self.image_scale = image_scale
         self.speed = speed
@@ -27,8 +27,8 @@ class Entity:
         self.max_health = self.health
         self.post_func = post_func
         self.solid = solid
-        self.lifetime = lifetime # By default -1 means not maximum lifespan
-        self.take_knockback = take_knockback
+        self.lifetime = -1 # By default -1 means not maximum lifespan
+        self.take_knockback = False
 
         self.pos = Vec(0, 0)
         self.vel = Vec(0, 0)
@@ -39,12 +39,12 @@ class Entity:
 
         default_image_size = (Vec(image.get_size()) * image_scale).tuple()
         # Size is the true hitbox size of the entity (doesn't affect iimage)
-        if size is None:
+        if hitbox_size is None:
             # By default size contains the entire image
             self.size = Vec(default_image_size)
         else:
             # Override hitbox size to custom dimensions
-            self.size = Vec(size)
+            self.size = Vec(hitbox_size)
 
         self.surface = pygame.Surface(default_image_size, pygame.SRCALPHA, 32).convert_alpha()
         self.image_size = Vec(image.get_size())
@@ -62,20 +62,6 @@ class Entity:
     def render(self, surface, pos):
         hitbox = self.hitbox()
         hitbox.center = pos.tuple()
-        # Draw healthbar meter
-        if self.health < self.max_health and (not self.invincible or self.is_player):
-            pos = Vec(hitbox.centerx, hitbox.top - 13)
-            bg_width = math.sqrt(self.max_health) * 8
-
-            if self.team == ALLY:
-                fg_color = (80, 130, 255)
-            else:
-                fg_color = (255, 0, 0)
-
-            if self.is_player and self.invincible:
-                fg_color = (119, 143, 155)
-
-            util.draw_meter(surface, pos, Vec(bg_width, 6), self.health/self.max_health,  fg_color, (0, 0, 0))
 
         render_rect = hitbox.copy()
         # Render image in center of hitbox
@@ -90,6 +76,22 @@ class Entity:
             self.shake_timer -= Globals.delta_time
 
         surface.blit(self.surface, render_rect)
+        # Draw healthbar meter
+        if self.is_player or not self.invincible:
+            if self.health < self.max_health:
+                pos = Vec(hitbox.centerx, render_rect.top - 13)
+                bg_width = math.sqrt(self.max_health) * 9z
+
+                if self.team == ALLY:
+                    fg_color = (80, 130, 255)
+                else:
+                    fg_color = (255, 0, 0)
+
+                if self.is_player and self.invincible:
+                    fg_color = (119, 143, 155)
+
+                util.draw_meter(surface, pos, Vec(bg_width, 6), self.health/self.max_health,  fg_color, (0, 0, 0))
+
         if Globals.debug_mode:
             pygame.draw.rect(surface, (255, 255, 255), hitbox)
 
@@ -149,10 +151,10 @@ def opposes(self, other):
         and (not other.invincible or other.is_player)
 
 
-class AI_Entity(Entity):
+class AIEntity(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
-            post_func=None, size=None, take_knockback=True):
-        super().__init__(name, image, image_scale, speed, team, health, post_func, size, take_knockback=take_knockback)
+                 post_func=None, hitbox_size=None):
+        super().__init__(name, image, image_scale, speed, team, health, post_func, hitbox_size)
         self.damage = damage
         self.sight_range = sight_range
         self.follow_weight = follow_weight
@@ -241,11 +243,11 @@ class AI_Entity(Entity):
         super().update(world)
 
 
-class Ranged_AI_Entity(AI_Entity):
+class RangedAIEntity(AIEntity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range, weapon_func,
-                 post_func=None, size=None, take_knockback=True):
+                 post_func=None, hitbox_size=None):
         super().__init__(name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
-                         post_func=post_func, size=size, take_knockback=take_knockback)
+                         post_func=post_func, hitbox_size=hitbox_size)
         self.weapon_func = weapon_func
 
     def attack(self, target_direction, world):
@@ -310,6 +312,8 @@ class Projectile(Entity):
                     damage *= self.parent.damage_multiplier
                 if other.is_player:
                     assets.play_sound(assets.SFX_OW_PLAYER)
+                    if other.has_metalsuit:
+                        self.distance = self.range + 1 # remove from world
                 other.hurt(damage, world)
 
             if other.take_knockback:

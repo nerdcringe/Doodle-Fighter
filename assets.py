@@ -71,7 +71,7 @@ IMG_SOUND_ON = util.scale_image(load_image("ui_sound_on.png"), 0.4)
 IMG_SOUND_OFF = util.scale_image(load_image("ui_sound_off.png"), 0.4)
 
 
-IMG_BG_CITY = load_image("bg_city.png")
+IMG_BG_CITY = load_image("bg_city_alt.png")
 
 IMG_PLAYER_ALIVE = load_image("player_alive.png")
 IMG_PLAYER_DEAD = load_image("player_dead.png")
@@ -81,6 +81,7 @@ IMG_PLAYER_METALSUIT = load_image("player_metalsuit.png")
 IMG_BRAWLER = load_image("brawler.png")
 IMG_BRAWLER_BOSS = load_image("brawler_boss.png")
 IMG_RANGER = load_image("ranger.png")
+IMG_BOOMER = load_image("boomer.png")
 
 IMG_PROJECTILE_BULLET = load_image("projectile_bullet.png")
 IMG_PROJECTILE_ARROW = load_image("projectile_arrow.png")
@@ -89,8 +90,14 @@ IMG_EXPLOSION = load_image("explosion.png")
 
 
 IMG_TREE = load_image("tree.png")
+IMG_TREE_WINTER = load_image("tree_winter.png")
 IMG_ROCK = load_image("rock.png")
+
 IMG_GRAVE = load_image("grave.png")
+IMG_BUILDING = load_image("building.png")
+IMG_HOUSE = load_image("house.png")
+IMG_NEXT_SIGN = load_image("next.png")
+
 
 IMG_DMG_UP = load_image("pickup_dmg_up.png")
 IMG_APPLE = load_image("pickup_apple.png")
