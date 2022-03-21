@@ -3,10 +3,11 @@ import random
 from vector import Vec
 import util
 from globals import Globals
+import assets
 
 
 class World:
-    def __init__(self, name, size, outer_color, inner_color=None, image=None):
+    def __init__(self, name, size, outer_color, inner_color=None, image=None, music=None):
         self.name = name
         self.size = size
         self.bg_surface = pygame.Surface(size.tuple(), pygame.SRCALPHA, 32)
@@ -25,6 +26,16 @@ class World:
         self.entities = []
         self.spawners = []
         self.completed = False
+
+        self.music = music
+
+    def start_music(self):
+        if self.music is not None:
+            pygame.mixer.music.load(self.music)
+            if Globals.sound_on:
+                pygame.mixer.music.play(-1)
+        else:
+            pygame.mixer.music.pause()
 
     def render(self, surface, pos):
         surface.blit(self.bg_surface, pos.tuple())

@@ -35,17 +35,17 @@ def font_path(name):
 
 
 
-
 MAIN_FONT = font_path("StayPuft.ttf")
 
 MUSIC_OVERWORLD = load_music("overworld.wav")
+MUSIC_FOREST = load_music("forest.wav")
 
 sfx = []
 SFX_HIT_1 = load_sfx("hit_1.wav", 0.2)
 SFX_HIT_2 = load_sfx("hit_2.wav")
 SFX_HIT_3 = load_sfx("hit_3.wav", 0.3)
 SFX_SHOOT_1 = load_sfx("shoot_1.wav", 0.45)
-SFX_SHOOT_2 = load_sfx("shoot_2.wav")
+SFX_SHOOT_2 = load_sfx("shoot_2.wav", 0.45)
 SFX_SHOOT_SG = load_sfx("shoot_sg.wav", 0.3)
 SFX_SHOOT_ARROW = load_sfx("shoot_arrow.wav")
 SFX_SHOOT_GRENADE = load_sfx("shoot_grenade.wav", 0.5)
@@ -60,9 +60,15 @@ def random_shoot_sfx():
     return random.choice((SFX_SHOOT_1, SFX_SHOOT_2))
 
 
-def play_sound(sound):
+def play_sound(sound, pan=0):
     if Globals.sound_on:
-        pygame.mixer.Sound.play(sound)
+
+        played_sound = sound.play()
+        if pan != 0:
+            volume = sound.get_volume()
+            print(pan)
+            played_sound.set_volume(volume + pan, volume - pan)
+
 
 
 IMG_CURSOR_ARROW = load_image("ui_cursor_arrow.png")
@@ -82,10 +88,13 @@ IMG_PLAYER_INVIS = load_image("player_invis.png")
 IMG_BRAWLER = load_image("brawler.png")
 IMG_BRAWLER_BOSS = load_image("brawler_boss.png")
 IMG_RANGER = load_image("ranger.png")
+IMG_RANGER_BOSS = load_image("ranger_boss.png")
 IMG_BOOMER = load_image("boomer.png")
 IMG_CAR_FRONT = load_image("car_front.png")
 IMG_CAR_SIDE = load_image("car_side.png")
+
 IMG_ALLY = load_image("ally.png")
+
 
 IMG_PROJECTILE_BULLET = load_image("projectile_bullet.png")
 IMG_PROJECTILE_ARROW = load_image("projectile_arrow.png")
@@ -111,4 +120,4 @@ IMG_GRENADE = load_image("item_grenade.png")
 IMG_SPEED_SHOES = load_image("item_speed.png")
 IMG_SHIELD = load_image("item_shield.png")
 IMG_METALSUIT = load_image("item_metalsuit.png")
-IMG_ALLY_DELIVERY = load_image("item_ally_delivery.png")
+IMG_WRENCH = load_image("item_wrench.png")

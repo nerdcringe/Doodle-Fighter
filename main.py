@@ -9,6 +9,7 @@ pygame.mouse.set_visible(False)
 
 window = pygame.display.set_mode(Globals.SIZE.tuple(), pygame.DOUBLEBUF | pygame.RESIZABLE)
 clock = pygame.time.Clock()
+pygame.mixer.music.set_volume(0.1)
 
 
 
@@ -47,7 +48,7 @@ def new_brawler():
     return AIEntity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, post_func=brawler_loot)
 
 def new_brawler_boss():
-    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.53, 0.6, ENEMY, 50, 3, 2000, 0.04, 2000, 225,
+    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.6, ENEMY, 50, 3, 2000, 0.04, 2000, 225,
                     hitbox_size=Vec(128, 128), post_func=brawler_boss_loot)
     boss.take_knockback = False
     return boss
@@ -55,6 +56,10 @@ def new_brawler_boss():
 def new_ranger():
     return RangedAIEntity("Ranger", assets.IMG_RANGER, 0.25, 0.35, ENEMY, 4, 1, 700, follow_weight=0.08,
         atk_interval=2000, retreat_range=350, weapon_func=arrow_shot, post_func=ranger_loot, hitbox_size=Vec(64, 64))
+
+def new_ranger_boss():
+    return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, 0.3, ENEMY, 40, 1, 600, follow_weight=0.05,
+        atk_interval=1000, retreat_range=350, weapon_func=arrow_shot, post_func=ranger_loot, hitbox_size=Vec(100, 100))
 
 def new_boomer():
     return RangedAIEntity("Boomer", assets.IMG_BOOMER, 0.3, 0.25, ENEMY, 8, 1, 400, 0.05, 3000, 250,
@@ -65,8 +70,8 @@ def new_car():
                     post_func=car_loot, side_image=assets.IMG_CAR_SIDE)
 
 def new_ally():
-    return RangedAIEntity("Brawler", assets.IMG_ALLY, 0.3, 0.4, ALLY, 8, 1, sight_range=600, follow_weight=1,
-                          atk_interval=1500, retreat_range=150, weapon_func=shotgun_shot)
+    return RangedAIEntity("Ally Bot", assets.IMG_ALLY, 0.25, 0.4, ALLY, 8, 1, sight_range=600, follow_weight=0.05,
+                          atk_interval=1500, retreat_range=150, weapon_func=shotgun_shot, hitbox_size=Vec(64, 64))
 
 
 def new_apple_item():
@@ -97,8 +102,8 @@ def new_metalsuit_item():
 def new_invis_item():
     return Item("Invis", assets.IMG_PLAYER_INVIS, 0.25, lambda: gain_powerup(invis))
 
-def new_ally_delivery():
-    return Item("Ally Delivery", assets.IMG_ALLY_DELIVERY, 0.25, lambda:  current_world.add(player.pos - Vec(0, 5), new_ally()))
+def new_wrench():
+    return Item("Wrench", assets.IMG_WRENCH, 0.25, lambda:  current_world.add(player.pos - Vec(0, 5), new_ally()))
 
 
 
@@ -136,7 +141,7 @@ def spawn_grave(self, world, team):
 
 def spawn_explosion(self, world, team):
     assets.play_sound(assets.SFX_BOOM)
-    world.add(self.pos, Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.04, team, None, 3, self.vel, 100, parent=self, blockable=False))
+    world.add(self.pos, Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.05, team, None, 3, self.vel, 10, blockable=False))
 
 def spawn_poof(self, world, team):
     poof = Entity("Poof", assets.IMG_POOF, 1, 0.01, NEUTRAL)
@@ -161,14 +166,15 @@ def ranger_loot(self, world, team):
         world.add(self.pos, loot())
 
 def boomer_loot(self, world, team):
+    spawn_explosion(self, world, team)
     if random.random() < 0.25:
-        loot = random.choice((new_grenade_item, new_ally_delivery))
+        loot = random.choice((new_grenade_item,))
         world.add(self.pos, loot())
 
 def car_loot(self, world, team):
     spawn_explosion(self, world, team)
     if random.random() < 0.25:
-        loot = random.choice((new_metalsuit_item,))
+        loot = random.choice((new_metalsuit_item, new_wrench))
         world.add(self.pos, loot())
 
 def brawler_boss_loot(self, world, team):
@@ -254,6 +260,7 @@ def set_world(new_world):
         current_world.remove(player)
         current_world = new_world
         new_world.add(Vec(new_world.size/2), player)
+        new_world.start_music()
 
 
 
@@ -293,6 +300,8 @@ def debug(key, mouse_world_pos):
         current_world.add(mouse_world_pos, new_car())
     elif key == pygame.K_h:
         current_world.add(mouse_world_pos, new_ally())
+    elif key == pygame.K_t:
+        current_world.add(mouse_world_pos, new_ranger_boss())
 
     elif key == pygame.K_1:
         current_world.add(mouse_world_pos, new_apple_item())
@@ -314,7 +323,7 @@ def debug(key, mouse_world_pos):
     if key == pygame.K_9:
         current_world.add(mouse_world_pos, new_invis_item())
     elif key == pygame.K_0:
-        current_world.add(mouse_world_pos, new_ally_delivery())
+        current_world.add(mouse_world_pos, new_wrench())
 
     elif key == pygame.K_v:
         Globals.debug_mode = not Globals.debug_mode
@@ -332,21 +341,11 @@ def debug(key, mouse_world_pos):
         set_world(worlds[index])
 
 
-def set_sound(on):
-    if on:
-        pass#pygame.mixer.music.play(-1)
-    else:
-        pygame.mixer.music.pause()
 
 
 if __name__ == "__main__":
     while True:
         frames = 0
-
-        pygame.mixer.music.set_volume(0.35)
-        pygame.mixer.music.load(assets.MUSIC_OVERWORLD)
-        set_sound(False)
-
 
         shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 20000)
         arrows = Powerup("Arrows", assets.IMG_ARROWS, 20000)
@@ -367,14 +366,14 @@ if __name__ == "__main__":
 
 
         worlds = []
+
         overworld = World("Overworld", Vec(2500, 2500), (220, 200, 140), (85, 175, 95))
         worlds.append(overworld)
-        current_world = overworld
 
         city_world = World("Cityworld", Vec(3000, 3000), (105, 210, 150), (175, 175, 175))#image=assets.IMG_BG_CITY)
         worlds.append(city_world)
 
-        forest_world = World("Forestworld", Vec(2250, 2250), (13, 46, 37), (35, 75, 65))
+        forest_world = World("Forestworld", Vec(2250, 2250), (13, 46, 37), (35, 75, 65), music=assets.MUSIC_FOREST)
         #forest_world = World("Forestworld", Vec(2000, 2000), (30, 34, 41), (56, 70, 94))
         worlds.append(forest_world)
 
@@ -384,6 +383,10 @@ if __name__ == "__main__":
 
         #house_world = World("HouseWorld", Vec(800, 800), (201, 156, 40), (217, 191, 124))
         #worlds.append(house_world)
+
+
+        current_world = overworld
+        current_world.start_music()
 
 
         player_speed = 0.65
@@ -456,9 +459,14 @@ if __name__ == "__main__":
 
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, MOUSE_WORLD_POS)
+
                     if event.key == pygame.K_m:
                         Globals.sound_on = not Globals.sound_on
-                        set_sound(Globals.sound_on)
+                        if Globals.sound_on:
+                            current_world.start_music()
+                        else:
+                            pygame.mixer.music.pause()
+
                     """if event.key == pygame.K_e:
                         for entity in player.last_collisions:
                             if entity.name == "House":
@@ -502,7 +510,7 @@ if __name__ == "__main__":
                 player.take_knockback = True
 
             if powerups[metalsuit] <= 0 and powerups[invis] <= 0:
-                if player.current_image is not assets.IMG_PLAYER_OW or player.current_image is not assets.IMG_PLAYER_DEAD:
+                if player.current_image is not assets.IMG_PLAYER_OW and player.current_image is not assets.IMG_PLAYER_DEAD:
                     player.set_image(assets.IMG_PLAYER_ALIVE)
 
 

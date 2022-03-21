@@ -96,7 +96,7 @@ class Entity:
                 util.draw_bar(surface, pos, Vec(bg_width, 6), self.health / self.max_health, fg_color, (0, 0, 0))
 
         if Globals.debug_mode:
-            pygame.draw.rect(surface, (255, 255, 255), hitbox)
+            pygame.draw.rect(surface, (255, 255, 255), hitbox, 3)
 
     def update(self, world):
         self.time += Globals.delta_time
@@ -136,7 +136,7 @@ class Entity:
         if not self.invincible:
             self.health -= amount
             self.health = max(0, self.health)
-            self.shake_timer = 200
+            self.shake_timer = 150
         if self.health <= 0 and alive:
             if self.post_func is not None:
                 self.post_func(self, world, self.team)
@@ -161,7 +161,7 @@ class AIEntity(Entity):
         self.sight_range = sight_range
         self.follow_weight = follow_weight
         self.atk_interval = atk_interval
-        self.atk_timer = self.atk_interval
+        self.atk_timer = 0
         self.retreat_range = retreat_range
         if side_image is not None:
             self.right_image = side_image
@@ -297,12 +297,13 @@ class Projectile(Entity):
         self.range = Range
         if rotate:
             self.rotate(self.vel.angle())
-        self.parent = parent
         self.blockable = blockable
 
-        if self.parent is None:
+        if parent is None:
             self.init_vel = Vec(0, 0)
         else:
+            if parent.is_player:
+                self.damage *= parent.damage_multiplier
             self.init_vel = parent.vel
         self.vel += self.init_vel
         self.distance = 0
@@ -334,8 +335,6 @@ class Projectile(Entity):
             other.shake_timer = 150
             if opposed:
                 damage = self.damage
-                if self.parent.is_player:
-                    damage *= self.parent.damage_multiplier
                 if other.is_player:
                     assets.play_sound(assets.SFX_OW_PLAYER)
                     if other.invincible:
