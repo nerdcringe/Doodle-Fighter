@@ -11,14 +11,20 @@ ENEMY = 1
 NEUTRAL = 2
 
 
+def opposes(self, other):
+    return ((self.team == ALLY and other.team == ENEMY) \
+            or (self.team == ENEMY and other.team == ALLY) \
+            or (self.team == ALLY and other.team == NEUTRAL)) \
+            and (not other.invincible or other.is_player)
+
+
 class Entity:
-    def __init__(self, name, image, image_scale=1, speed=0, team=NEUTRAL, health=None, post_func=None, hitbox_size=None,
-                 solid=False):
+    def __init__(self, name, image, image_scale=1, team=NEUTRAL, health=None, solid=False, hitbox_size=None,
+                 post_func=None):
         self.name = name
         self.default_image = image
         self.current_image = image
         self.image_scale = image_scale
-        self.speed = speed
         self.team = team
 
         if health == None:
@@ -28,17 +34,21 @@ class Entity:
             self.health = health
             self.invincible = False
         self.max_health = self.health
-        self.post_func = post_func
         self.solid = solid
-        self.lifetime = -1  # By default -1 means not maximum lifespan
-        self.take_knockback = False
+        self.post_func = post_func # Callback to run after death
 
         self.pos = Vec(0, 0)
         self.vel = Vec(0, 0)
-        self.last_collisions = set([])
-        self.time = 0  # Total time alive in world
+        self.speed = 0
         self.shake_timer = 0  # Timer to track how long to shake sprite
+        self.take_knockback = False # Whether to get pushed back when hurt
+        self.last_collisions = set([])
+
+        self.world = None
+        self.lifetime = -1  # The amount of time able to live before dying. The default value -1 means live forever
+        self.time = 0  # Total time alive in world
         self.is_player = False
+
 
         default_image_size = (Vec(image.get_size()) * image_scale).tuple()
         # Size is the true hitbox size of the entity (doesn't affect iimage)
@@ -62,7 +72,7 @@ class Entity:
     def rotate(self, angle):
         self.surface = pygame.transform.rotate(self.surface, angle)
 
-    def render(self, surface, pos):
+    def render(self, surface, overlay_surface, pos):
         hitbox = self.hitbox()
         hitbox.center = pos.tuple()
 
@@ -105,12 +115,20 @@ class Entity:
             self.vel = self.vel.norm() * self.speed
         self.pos += self.vel * Globals.delta_time
 
-        # keep entity within world bounds (stays a "radius" length from wall)
-        self.pos.x = util.clamp(self.pos.x, self.image_size.x / 2, world.size.x - self.image_size.x / 2)
-        self.pos.y = util.clamp(self.pos.y, self.image_size.y / 2, world.size.y - self.image_size.y / 2)
+        # keep entity within world bounds (stays a "radius" length from wall) if it is able to move
+        # if the entity has 0 speed (doesn't move), then it was placed out of bounds intentionally
+        if self.speed != 0:
+            self.keep_in_bounds(world)
 
         if self.time > self.lifetime and self.lifetime != -1:
             world.remove(self)
+
+    def keep_in_bounds(self, world):
+        self.pos.x = util.clamp(self.pos.x, self.size.x / 2, world.size.x - self.size.x / 2)
+
+        # Keep bottom 20 pixels inside the world boundaries instead of the entire entity
+        # This simulates the depth of the entity, maintaining the illusion of 3D
+        self.pos.y = util.clamp(self.pos.y, -self.size.y / 2 + 20, world.size.y - self.size.y / 2)
 
     def colliding(self, other):
         return self.hitbox().colliderect(other.hitbox())
@@ -120,7 +138,7 @@ class Entity:
             bottom = self.pos.y + self.size.y / 2
             other_bottom = other.pos.y + other.size.y / 2
             # Keep base of other entity either above or below base of this entity
-            if other_bottom < bottom - 0:
+            if other_bottom < bottom:
                 other.pos.y = min(other_bottom + 20, bottom) - other.size.y / 2 - 20
             else:
                 other.pos.y = max(other_bottom - 20, bottom) - other.size.y / 2 + 20
@@ -146,17 +164,45 @@ class Entity:
         return "{name} at {pos}".format(name=self.name, pos=self.pos)
 
 
-def opposes(self, other):
-    return ((self.team == ALLY and other.team == ENEMY) \
-            or (self.team == ENEMY and other.team == ALLY) \
-            or (self.team == ALLY and other.team == NEUTRAL)) \
-            and (not other.invincible or other.is_player)
+class Portal(Entity):
+    """ Sends the player to a desired world, position, or entity when interacted with (SPACE or right click)"""
+
+    def __init__(self, name, image, image_scale, team=NEUTRAL, health=None, hover_message="",
+                 to_world=None, to_position=None, to_entity=None, solid=False,
+                hitbox_size=None, post_func=None):
+
+        super().__init__(name, image, image_scale, team, health, solid=solid, hitbox_size=hitbox_size, post_func=post_func)
+        self.hover_message = hover_message
+        self.to_world = to_world
+        self.to_position = to_position
+        self.to_entity = to_entity
+
+        self.touching_player = False
+
+    def render(self, surface, overlay_surface, pos):
+        super().render(surface, overlay_surface, pos)
+        if self.touching_player:
+            util.write(overlay_surface, self.hover_message, assets.MAIN_FONT, 45,(Globals.SIZE / 2) + Vec(0, 100),
+                       (255, 255, 255), center=True)
+
+    def update(self, world):
+        super().update(world)
+        self.touching_player = False
+
+
+    def collide(self, other, world):
+        super().collide(other, world)
+        if other.is_player:
+            self.touching_player = True
+
+
 
 
 class AIEntity(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
                  post_func=None, hitbox_size=None, side_image=None):
-        super().__init__(name, image, image_scale, speed, team, health, post_func, hitbox_size)
+        super().__init__(name, image, image_scale, team, health, solid=False, hitbox_size=hitbox_size, post_func=post_func)
+        self.speed = speed
         self.damage = damage
         self.sight_range = sight_range
         self.follow_weight = follow_weight
@@ -172,7 +218,7 @@ class AIEntity(Entity):
 
         self.wandering = False
 
-    def render(self, surface, pos):
+    def render(self, surface, overlay_surface, pos):
         if self.right_image is not None:
             if abs(self.vel.x) > abs(self.vel.y):
                 if self.vel.x > 0:
@@ -182,17 +228,7 @@ class AIEntity(Entity):
             else:
                 self.set_image(self.default_image)
 
-        super().render(surface, pos)
-
-    def collide(self, other, world):
-        super().collide(other, world)
-        """if opposes(self, other) and other not in self.last_collisions:
-            other.hurt(self.damage, world)
-            if other.take_knockback:
-                other.accel((other.pos - self.pos) * 0.01)
-                pygame.mixer.Sound.play(assets.SFX_HIT_1)
-
-            self.atk_timer = 0"""
+        super().render(surface, overlay_surface, pos)
 
     def in_range(self, other):
         return Vec.dist(self.pos, other.pos) <= self.sight_range
@@ -291,7 +327,8 @@ class RangedAIEntity(AIEntity):
 class Projectile(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, direction, Range, parent=None,
                  blockable=True, rotate=True, post_func=None):
-        super().__init__(name, image, image_scale, speed, team, health, post_func=post_func)
+        super().__init__(name, image, image_scale, team, health, post_func=post_func)
+        self.speed = speed
         self.damage = damage
         self.vel = direction.norm() * self.speed
         self.range = Range
@@ -352,8 +389,8 @@ class Projectile(Entity):
 class Item(Entity):
     def __init__(self, name, image, image_scale, collide_func, condition=None):
         super().__init__(name, image, image_scale)
-        self.collide_func = collide_func
-        self.condition = condition
+        self.collide_func = collide_func # Callback function to run when the player collides
+        self.condition = condition # Boolean function that must be true to collect the item
 
     def hitbox(self):
         # Bob up and down to indicate that this is a pickup

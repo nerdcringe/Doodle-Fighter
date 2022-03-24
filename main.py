@@ -11,6 +11,7 @@ window = pygame.display.set_mode(Globals.SIZE.tuple(), pygame.DOUBLEBUF | pygame
 clock = pygame.time.Clock()
 pygame.mixer.music.set_volume(0.1)
 
+overlay = pygame.Surface(window.get_size()).convert_alpha()
 
 
 def screen_pos(v):
@@ -35,13 +36,39 @@ def new_winter_tree():
     return Entity("Winter Tree", assets.IMG_TREE_WINTER, 0.675, health=25, solid=True, hitbox_size=Vec(30, 320),
                   post_func=tree_loot)
 
-
 def new_rock():
     return Entity("Rock", assets.IMG_ROCK, 1, solid=True, hitbox_size=Vec(85, 50))
 
+def new_office(num = ""):
+    size = Vec(random.randint(750, 1250), random.randint(750, 1250))
 
-def new_building():
-    return Entity("Building", assets.IMG_BUILDING, 1, health=50, hitbox_size = Vec(125, 160), solid=True)
+    office = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(145, 180), solid=True)
+
+    # Each office is its own instance of a dungeon world
+    office_world = World("Officeworld #" + str(num), size, (91, 108, 120), (191, 180, 147))
+
+    door = Portal("Door", assets.IMG_DOOR, 0.8, to_entity=office)
+    office_world.add(Vec(size.x/2, -60), door)
+
+
+    chance = random.random()
+    if chance < 0.2:
+        office_world.add(Vec(size.x/2, size.y), new_ranger_boss())
+    elif chance < 0.4:
+        office_world.add(Vec(size.x/2, size.y), new_brawler_boss())
+    elif chance < 0.6:
+        for i in range(3):
+            office_world.add(Vec(size.x/2, size.y), new_boomer())
+    elif chance < 0.8:
+        for i in range(3):
+            office_world.add(Vec(size.x/2, size.y), new_ranger())
+    else:
+        for i in range(4):
+            office_world.add(Vec(size.x/2, size.y), new_brawler())
+
+
+    office.to_entity = door
+    return office
 
 
 def new_brawler():
@@ -66,8 +93,8 @@ def new_boomer():
                           weapon_func=grenade_shot, post_func=boomer_loot, hitbox_size=Vec(70, 70))
 
 def new_car():
-    return AIEntity("Car", assets.IMG_CAR_FRONT, 0.5, 0.5, ENEMY, 14, 2, 250, 0.1, 5000, retreat_range=400,
-                    post_func=car_loot, side_image=assets.IMG_CAR_SIDE)
+    return AIEntity("Car", assets.IMG_CAR_FRONT, 0.5, 0.5, ENEMY, 14, 2, 250, 0.1,
+                    atk_interval=5000, retreat_range=400, post_func=car_loot, side_image=assets.IMG_CAR_SIDE)
 
 def new_ally():
     return RangedAIEntity("Ally Bot", assets.IMG_ALLY, 0.25, 0.4, ALLY, 8, 1, sight_range=600, follow_weight=0.05,
@@ -182,7 +209,6 @@ def brawler_boss_loot(self, world, team):
     world.add(self.pos, loot())
 
 
-
 Globals.cursor_img = assets.IMG_CURSOR_TARGET
 
 
@@ -201,7 +227,8 @@ def draw_cursor(surface):
 
 class Player(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, post_func=None, hurt_func=None):
-        super().__init__(name, image, image_scale, speed, team, health, post_func=post_func)
+        super().__init__(name, image, image_scale, team, health, post_func=post_func)
+        self.speed = speed
         self.hurt_func = hurt_func
         self.is_player = True
         self.damage_multiplier = 1
@@ -230,6 +257,30 @@ class Player(Entity):
         self.accel(direction.norm() * 0.12)
         if not (horizontal or vertical):
             self.vel *= 0.88
+
+    def collide(self, other, world):
+        global interact
+        super().collide(other, world)
+
+        if isinstance(other, Portal):
+            if interact:
+                if other.to_world is not None:
+                    set_world(other.to_world)
+                    if other.to_position is None:
+                        # Go to the center of the world if position is unspecified
+                        self.pos = other.to_world.size/2
+
+                if other.to_position is not None:
+                    self.pos = Vec(other.to_position)
+
+                if other.to_entity is not None:
+                    print(other.to_entity.world)
+                    set_world(other.to_entity.world) # Go to the entity's world
+
+                    self.pos = Vec(other.to_entity.pos) # Go to the entity's position
+            self.keep_in_bounds(world)
+            interact = False
+
 
     def hurt(self, amount, world):
         super().hurt(amount, world)
@@ -342,7 +393,6 @@ def debug(key, mouse_world_pos):
 
 
 
-
 if __name__ == "__main__":
     while True:
         frames = 0
@@ -370,15 +420,16 @@ if __name__ == "__main__":
         overworld = World("Overworld", Vec(2500, 2500), (220, 200, 140), (85, 175, 95))
         worlds.append(overworld)
 
-        city_world = World("Cityworld", Vec(3000, 3000), (105, 210, 150), (175, 175, 175))#image=assets.IMG_BG_CITY)
+        city_world = World("Cityworld", Vec(2500, 2500), (105, 210, 150), (175, 175, 175))#image=assets.IMG_BG_CITY)
         worlds.append(city_world)
+
 
         forest_world = World("Forestworld", Vec(2250, 2250), (13, 46, 37), (35, 75, 65), music=assets.MUSIC_FOREST)
         #forest_world = World("Forestworld", Vec(2000, 2000), (30, 34, 41), (56, 70, 94))
         worlds.append(forest_world)
 
 
-        cave_world = World("Caveworld", Vec(2000, 1400),  (10, 10, 10), (40, 40, 40))
+        cave_world = World("Caveworld", Vec(1400, 2000),  (10, 10, 10), (40, 40, 40))
         worlds.append(cave_world)
 
         #house_world = World("HouseWorld", Vec(800, 800), (201, 156, 40), (217, 191, 124))
@@ -395,22 +446,41 @@ if __name__ == "__main__":
 
 
         overworld.add(Vec(500, 500), Entity("House", assets.IMG_HOUSE, 0.8, solid=True))
+
+        cave_entrance = Portal("Cave", assets.IMG_CAVE, 1, solid=True, hitbox_size=Vec(260, 140),
+                               hover_message="Enter Cave? (SPACE)")
+        overworld.add(Vec(1500, 1500), cave_entrance)
+
         for i in range(15):
             overworld.add(overworld.rand_pos(), new_rock())
+
         overworld.add_spawner(Spawner(8000, new_tree, max_num=12, center_spread=1.25, pre_spawned=12))
         overworld.add_spawner(Spawner(4000, new_brawler, max_num=5))
         #overworld.add_spawner(Spawner(10000, new_ranger, max_num=3))
         overworld.add_spawner(Spawner(45000, new_brawler_boss, max_num=1))
 
-        city_world.add_spawner(Spawner(0, new_building, max_num=12, pre_spawned=12))
-        city_world.add_spawner(Spawner(0, new_tree_city, max_num=6, center_spread=1.25, pre_spawned=6))
+        offices = []
+        for i in range(10):
+            office = new_office(i)
+            city_world.add(city_world.rand_pos(), office)
+            offices.append(office)
+
+        city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
+        city_world.add_spawner(Spawner(0, new_tree_city, max_num=8, pre_spawned=8))
         city_world.add_spawner(Spawner(0, new_car, max_num=3, pre_spawned=3))
 
 
         for i in range(8):
             forest_world.add(forest_world.rand_pos(), new_rock())
-        #forest_world.add_spawner(Spawner(7000, new_ranger, max_num=4, pre_spawned=2))
-        forest_world.add_spawner(Spawner(5000, new_winter_tree, max_num=5, pre_spawned=20))
+        forest_world.add_spawner(Spawner(6000, new_ranger, max_num=4, pre_spawned=2))
+        forest_world.add_spawner(Spawner(5000, new_winter_tree, max_num=20, pre_spawned=20))
+
+        cave_exit = Portal("Cave Exit", assets.IMG_CAVE_EXIT, 1.25, solid=False,
+                           hover_message="Exit Cave? (SPACE)", to_world=overworld, to_entity=cave_entrance)
+        cave_world.add(Vec(700, -80), cave_exit)
+        # Reference cave entrances's destination to the cave exit because now the exit is defined
+        #cave_entrance.to_world = cave_world
+        cave_entrance.to_entity = cave_exit
 
 
         cave_world.add_spawner(Spawner(3000, new_brawler_boss, max_num=4, pre_spawned=1))
@@ -420,7 +490,8 @@ if __name__ == "__main__":
             frames += 1
             Globals.delta_time = clock.tick(Globals.FPS)
 
-            keys = pygame.key.get_pressed()
+            keys_pressed = pygame.key.get_pressed()
+            interact = False
             MOUSE_POS = Vec(pygame.mouse.get_pos())
             MOUSE_WORLD_POS = world_pos(MOUSE_POS)
 
@@ -431,11 +502,15 @@ if __name__ == "__main__":
                     sys.exit()
 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
-                        Globals.sound_on = not Globals.sound_on
+                    if event.button == 3:
+                        interact = True
+                        print(event.button)
 
-                    elif player.health > 0:
-                        if event.button == 1:
+                    elif event.button == 1:
+                        if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
+                            Globals.sound_on = not Globals.sound_on
+
+                        elif player.health > 0:
                             powerups[invis] = 0
                             default_gun = True
 
@@ -459,6 +534,8 @@ if __name__ == "__main__":
 
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, MOUSE_WORLD_POS)
+                    if event.key == pygame.K_SPACE:
+                        interact = True
 
                     if event.key == pygame.K_m:
                         Globals.sound_on = not Globals.sound_on
@@ -473,8 +550,9 @@ if __name__ == "__main__":
                                 set_world(house_world)"""
                 elif event.type == pygame.VIDEORESIZE:
                     Globals.SIZE = Vec(event.size)
+                    overlay = pygame.Surface(event.size).convert_alpha()
 
-            if keys[pygame.K_r]:
+            if keys_pressed[pygame.K_r]:
                 break
 
 
@@ -514,12 +592,14 @@ if __name__ == "__main__":
                     player.set_image(assets.IMG_PLAYER_ALIVE)
 
 
-            player.control(keys)
+            player.control(keys_pressed)
 
             for s in current_world.spawners:
                 s.update(current_world)
+
             for e in current_world.entities:
                 e.update(current_world)
+
             for e in current_world.entities:
                 for other in current_world.entities:
                     if e is not other and e.colliding(other):
@@ -528,14 +608,17 @@ if __name__ == "__main__":
                     else:
                         e.last_collisions.discard(other)
 
+            # Render game foreground layer
+            overlay.fill((0, 0, 0, 0)) # Clear overlay, which is sometimes used by entities
             window.fill(current_world.outer_color)
             blit_pos = -player.pos + Globals.SIZE/2
             current_world.render(window, blit_pos)
 
             current_world.entities.sort(key = lambda e: e.pos.y + e.size.y / 2)
             for e in current_world.entities:
-                e.render(window, screen_pos(Vec(e.hitbox().center)))
+                e.render(window, overlay, screen_pos(Vec(e.hitbox().center)))
 
+            # Render overlay layer
             if Globals.show_overlay:
                 stats = [
                     "Position: " + str(player.pos.rounded()),
@@ -548,16 +631,16 @@ if __name__ == "__main__":
                     stats.append("# Entities: " + str(len(current_world.entities)))
                     stats.append("FPS: " + str(round(clock.get_fps(), 1)))
 
-                util.draw_bar(window, Vec(115, Globals.SIZE.y - 35 * 4 - 6), Vec(200, 33),
+                util.draw_bar(overlay, Vec(115, Globals.SIZE.y - 35 * 4 - 6), Vec(200, 33),
                               player.health / player.max_health, (80, 130, 255), (0, 0, 0), center=False)
 
                 stat_y = Globals.SIZE.y - 15  # - 35
                 for stat in stats:
                     stat_y -= 35
-                    util.write(window, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
+                    util.write(overlay, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
 
                 if player.health <= 0:
-                    util.write(window, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE / 2 + Vec(0, 100), (255, 255, 255),
+                    util.write(overlay, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE / 2 + Vec(0, 100), (255, 255, 255),
                                center=True)
                 x = 0
                 y = 0
@@ -565,23 +648,22 @@ if __name__ == "__main__":
                     if powerups[powerup] > 0:
                         image_size =  powerup.image.get_width()/2
                         image_pos = Vec(Globals.SIZE.x - 95 + image_size/2, 5 + image_size/2) + (Vec(-x * 80, y * 110))
-                        window.blit(powerup.image, image_pos.tuple())
+                        overlay.blit(powerup.image, image_pos.tuple())
                         timer_value = min(powerups[powerup] / powerup.current_max, 1)
-                        util.draw_bar(window, image_pos + Vec(35, 85), Vec(50, 6), timer_value, (255, 255, 255),
+                        util.draw_bar(overlay, image_pos + Vec(35, 85), Vec(50, 6), timer_value, (255, 255, 255),
                                       (100, 100, 100), center=True)
                         x += 1
                         if x >= 3:
                             x = 0
                             y += 1
+                sound_icon = None
+                if Globals.sound_on:
+                   sound_icon = assets.IMG_SOUND_ON
+                else:
+                   sound_icon = assets.IMG_SOUND_OFF
+                overlay.blit(sound_icon, (0, 0))
 
-            sound_icon = None
-            if Globals.sound_on:
-               sound_icon = assets.IMG_SOUND_ON
-            else:
-               sound_icon = assets.IMG_SOUND_OFF
-            window.blit(sound_icon, (0, 0))
+            draw_cursor(overlay)
 
-
-            draw_cursor(window)
-
+            window.blit(overlay, (0, 0))
             pygame.display.flip()

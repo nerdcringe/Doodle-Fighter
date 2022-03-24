@@ -43,6 +43,7 @@ class World:
 
     def add(self, pos, entity):
         self.entities.append(entity)
+        entity.world = self
         entity.pos = Vec(pos)
 
     def remove(self, entity):
@@ -98,3 +99,4 @@ class Spawner:
             spawn_pos = self.dest
 
         world.add(spawn_pos, entity)
+        entity.keep_in_bounds(world)

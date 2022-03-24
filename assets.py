@@ -108,8 +108,11 @@ IMG_TREE_WINTER = load_image("tree_winter.png")
 IMG_ROCK = load_image("rock.png")
 
 IMG_GRAVE = load_image("grave.png")
-IMG_BUILDING = load_image("building.png")
+IMG_OFFICE = load_image("office.png")
 IMG_HOUSE = load_image("house.png")
+IMG_CAVE = load_image("cave.png")
+IMG_CAVE_EXIT = load_image("cave_exit.png")
+IMG_DOOR = load_image("door.png")
 IMG_NEXT_SIGN = load_image("next.png")
 
 IMG_DMG_UP = load_image("item_dmg_up.png")
