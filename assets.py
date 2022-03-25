@@ -22,7 +22,7 @@ def load_image(name):
 def load_sfx(name, volume=0.4):
     path = os.path.join(RES_PATH, 'audio', name)
     sound = pygame.mixer.Sound(path)
-    sound.set_volume(volume*0.5)
+    sound.set_volume(volume*0.75)
     sfx.append(sound)
     return sound
 

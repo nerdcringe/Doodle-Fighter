@@ -81,7 +81,7 @@ class Entity:
         render_rect.x += (self.size.x - self.image_size.x) / 2
         render_rect.y += (self.size.y - self.image_size.y) / 2
 
-        if self.shake_timer > 0:
+        if self.shake_timer > 0 and not isinstance(self, Projectile):
             dist = 3
             if True:  # not self.is_player:
                 render_rect.x += random.randint(-dist, dist)
@@ -176,8 +176,19 @@ class Portal(Entity):
         self.to_world = to_world
         self.to_position = to_position
         self.to_entity = to_entity
-
         self.touching_player = False
+
+    def destination_position(self):
+        if self.to_position is not None: # Go to position if specified
+            return self.to_position
+        elif self.to_entity is not None: # Go to entity's position if entity is specified
+            return Vec(self.to_entity.pos)
+        return None
+
+    def destination_world(self):
+        if self.to_entity is not None: # Go to the entity's world if entity is specified
+            return self.to_entity.world
+        return self.to_world
 
     def render(self, surface, overlay_surface, pos):
         super().render(surface, overlay_surface, pos)

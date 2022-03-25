@@ -39,16 +39,18 @@ def new_winter_tree():
 def new_rock():
     return Entity("Rock", assets.IMG_ROCK, 1, solid=True, hitbox_size=Vec(85, 50))
 
-def new_office(num = ""):
+def new_office(name="Officeworld"):
     size = Vec(random.randint(750, 1250), random.randint(750, 1250))
 
     office = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(145, 180), solid=True)
 
-    # Each office is its own instance of a dungeon world
-    office_world = World("Officeworld #" + str(num), size, (91, 108, 120), (191, 180, 147))
+    # Each office is its own instance of a mini dungeon world where you are presented with a type of enemy
+    office_world = World(name, size, (91, 108, 120), (191, 180, 147))
 
-    door = Portal("Door", assets.IMG_DOOR, 0.8, to_entity=office)
+    door = Portal("Door", assets.IMG_DOOR, 0.8, to_entity=office) # Exiting the door sends player outside the office
     office_world.add(Vec(size.x/2, -60), door)
+
+    office.to_entity = door # Set office destination to the door inside the office
 
 
     chance = random.random()
@@ -66,8 +68,6 @@ def new_office(num = ""):
         for i in range(4):
             office_world.add(Vec(size.x/2, size.y), new_brawler())
 
-
-    office.to_entity = door
     return office
 
 
@@ -149,6 +149,7 @@ def shotgun_shot(world, parent, team, direction):
     for i in range(count):
         new_direction = Vec.polar(1, current_angle - direction.angle())
         world.add(parent.pos, new_bullet(parent, team, new_direction, 250))
+        world.add(parent.pos, new_bullet(parent, team, new_direction, 250))
         current_angle += total_spread / (count - 1)
 
 def arrow_shot(world, parent, team, direction):
@@ -164,11 +165,13 @@ def grenade_shot(world, parent, team, direction):
 
 
 def spawn_grave(self, world, team):
-    world.add(self.pos, Entity("Grave", assets.IMG_GRAVE, 0.35, health=25, team=team, solid=True))
+    world.add(self.pos, Entity("Grave", assets.IMG_GRAVE, 0.35, health=None, team=team, solid=True))
 
 def spawn_explosion(self, world, team):
     assets.play_sound(assets.SFX_BOOM)
-    world.add(self.pos, Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.05, team, None, 3, self.vel, 10, blockable=False))
+    explosion = Entity("Explosion", assets.IMG_EXPLOSION, 0.45, team, None, 2)
+    explosion.lifetime = 200
+    world.add(self.pos, explosion)
 
 def spawn_poof(self, world, team):
     poof = Entity("Poof", assets.IMG_POOF, 1, 0.01, NEUTRAL)
@@ -264,21 +267,15 @@ class Player(Entity):
 
         if isinstance(other, Portal):
             if interact:
-                if other.to_world is not None:
-                    set_world(other.to_world)
-                    if other.to_position is None:
-                        # Go to the center of the world if position is unspecified
-                        self.pos = other.to_world.size/2
+                new_world = other.destination_world()
+                new_position = other.destination_position()
 
-                if other.to_position is not None:
-                    self.pos = Vec(other.to_position)
-
-                if other.to_entity is not None:
-                    print(other.to_entity.world)
-                    set_world(other.to_entity.world) # Go to the entity's world
-
-                    self.pos = Vec(other.to_entity.pos) # Go to the entity's position
-            self.keep_in_bounds(world)
+                if new_world is not None:
+                    # Go to the portal's destination world and position
+                    set_world(new_world)
+                if new_position is not None:
+                    self.pos = new_position
+                self.keep_in_bounds(new_world)
             interact = False
 
 
@@ -382,14 +379,20 @@ def debug(key, mouse_world_pos):
         Globals.show_overlay = not Globals.show_overlay
 
     elif key == pygame.K_b:
-        index = worlds.index(current_world) - 1
-        index = util.wraparound(index, 0, len(worlds) - 1)
-        set_world(worlds[index])
+        if current_world in worlds:
+            index = worlds.index(current_world) - 1
+            index = util.wraparound(index, 0, len(worlds) - 1)
+            set_world(worlds[index])
+        else:
+            set_world(worlds[0])
 
     elif key == pygame.K_n:
-        index = worlds.index(current_world) + 1
-        index = util.wraparound(index, 0, len(worlds) - 1)
-        set_world(worlds[index])
+        if current_world in worlds:
+            index = worlds.index(current_world) + 1
+            index = util.wraparound(index, 0, len(worlds) - 1)
+            set_world(worlds[index])
+        else:
+            set_world(worlds[0])
 
 
 
@@ -413,6 +416,8 @@ if __name__ == "__main__":
             metalsuit: 0,
             invis: 0,
         }
+
+        #ally_inventory = []
 
 
         worlds = []
@@ -461,11 +466,12 @@ if __name__ == "__main__":
 
         offices = []
         for i in range(10):
-            office = new_office(i)
+            print(i)
+            office = new_office("Officeworld #" + str(i))
             city_world.add(city_world.rand_pos(), office)
             offices.append(office)
 
-        city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
+        #city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
         city_world.add_spawner(Spawner(0, new_tree_city, max_num=8, pre_spawned=8))
         city_world.add_spawner(Spawner(0, new_car, max_num=3, pre_spawned=3))
 
@@ -476,7 +482,7 @@ if __name__ == "__main__":
         forest_world.add_spawner(Spawner(5000, new_winter_tree, max_num=20, pre_spawned=20))
 
         cave_exit = Portal("Cave Exit", assets.IMG_CAVE_EXIT, 1.25, solid=False,
-                           hover_message="Exit Cave? (SPACE)", to_world=overworld, to_entity=cave_entrance)
+                           hover_message="Exit Cave? (SPACE)", to_entity=cave_entrance)
         cave_world.add(Vec(700, -80), cave_exit)
         # Reference cave entrances's destination to the cave exit because now the exit is defined
         #cave_entrance.to_world = cave_world
@@ -504,7 +510,6 @@ if __name__ == "__main__":
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 3:
                         interact = True
-                        print(event.button)
 
                     elif event.button == 1:
                         if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
@@ -554,6 +559,15 @@ if __name__ == "__main__":
 
             if keys_pressed[pygame.K_r]:
                 break
+
+            print(len(offices))
+            for office in offices:
+                if current_world is office.world:
+                    enemies = list(filter(lambda e: e.team == ENEMY, office.destination_world().entities))
+                    if len(enemies) == 0 and office in offices:
+                        office.world.remove(office)
+                        offices.remove(office)
+                        spawn_explosion(office, office.world, team=player)
 
 
             deplete_powerup(shotgun, Globals.delta_time)
@@ -608,8 +622,14 @@ if __name__ == "__main__":
                     else:
                         e.last_collisions.discard(other)
 
-            # Render game foreground layer
-            overlay.fill((0, 0, 0, 0)) # Clear overlay, which is sometimes used by entities
+            # Clear overlay, which is sometimes used by entities
+            if current_world is cave_world or current_world is forest_world:
+                # Make lighting darker in certain worlds
+                overlay.fill((0, 0, 0, 100))
+            else:
+                overlay.fill((0, 0, 0, 0))
+
+            # Render the game's foreground layer
             window.fill(current_world.outer_color)
             blit_pos = -player.pos + Globals.SIZE/2
             current_world.render(window, blit_pos)
@@ -617,6 +637,7 @@ if __name__ == "__main__":
             current_world.entities.sort(key = lambda e: e.pos.y + e.size.y / 2)
             for e in current_world.entities:
                 e.render(window, overlay, screen_pos(Vec(e.hitbox().center)))
+
 
             # Render overlay layer
             if Globals.show_overlay:
