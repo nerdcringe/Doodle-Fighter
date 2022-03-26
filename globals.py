@@ -10,5 +10,5 @@ class Globals:
     debug_mode = False
     show_overlay = True
 
-    sound_on = False
+    sound_on = True
 

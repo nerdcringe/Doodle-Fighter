@@ -159,9 +159,9 @@ def arrow_shot(world, parent, team, direction):
 
 def grenade_shot(world, parent, team, direction):
     assets.play_sound(assets.SFX_SHOOT_GRENADE)
-    grenade = Projectile("Grenade", assets.IMG_GRENADE, 0.2, 1, team, None, 2, direction, 400, parent=parent,
+    g = Projectile("Grenade", assets.IMG_GRENADE, 0.2, 1, team, None, 2, direction, 400, parent=parent,
                        post_func=spawn_explosion, blockable=True)
-    world.add(parent.pos, grenade)
+    world.add(parent.pos, g)
 
 
 def spawn_grave(self, world, team):
@@ -169,7 +169,7 @@ def spawn_grave(self, world, team):
 
 def spawn_explosion(self, world, team):
     assets.play_sound(assets.SFX_BOOM)
-    explosion = Entity("Explosion", assets.IMG_EXPLOSION, 0.45, team, None, 2)
+    explosion = Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0, team, None, 2, Vec(0, 1), 100)
     explosion.lifetime = 200
     world.add(self.pos, explosion)
 
@@ -466,7 +466,6 @@ if __name__ == "__main__":
 
         offices = []
         for i in range(10):
-            print(i)
             office = new_office("Officeworld #" + str(i))
             city_world.add(city_world.rand_pos(), office)
             offices.append(office)
@@ -560,7 +559,6 @@ if __name__ == "__main__":
             if keys_pressed[pygame.K_r]:
                 break
 
-            print(len(offices))
             for office in offices:
                 if current_world is office.world:
                     enemies = list(filter(lambda e: e.team == ENEMY, office.destination_world().entities))
