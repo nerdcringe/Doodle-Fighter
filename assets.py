@@ -60,14 +60,15 @@ def random_shoot_sfx():
     return random.choice((SFX_SHOOT_1, SFX_SHOOT_2))
 
 
-def play_sound(sound, pan=0):
+def play_sound(sound, dist=0, pan=0):
     if Globals.sound_on:
-
         played_sound = sound.play()
-        if pan != 0:
+        volume = 1 - (dist/1000)
+        played_sound.set_volume(min(1, volume))
+
+        """if pan != 0:
             volume = sound.get_volume()
-            print(pan)
-            played_sound.set_volume(volume + pan, volume - pan)
+            played_sound.set_volume(volume + pan, volume - pan)"""
 
 
 

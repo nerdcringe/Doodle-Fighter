@@ -1,3 +1,4 @@
+
 import sys
 import pygame
 from globals import Globals
@@ -7,12 +8,16 @@ pygame.display.set_caption('lifesim')
 pygame.key.set_repeat()
 pygame.mouse.set_visible(False)
 
+icon = pygame.image.load('res/img/icon.png')
+pygame.display.set_icon(icon)
+
+
 window = pygame.display.set_mode(Globals.SIZE.tuple(), pygame.DOUBLEBUF | pygame.RESIZABLE)
 clock = pygame.time.Clock()
 pygame.mixer.music.set_volume(0.1)
 
-overlay = pygame.Surface(window.get_size()).convert_alpha()
 
+overlay = pygame.Surface(window.get_size()).convert_alpha()
 
 def screen_pos(v):
     return v + Globals.SIZE/2 - player.pos
@@ -21,8 +26,10 @@ def world_pos(v):
     return v - Globals.SIZE/2 + player.pos
 
 
+import assets
 from entity import *
 from world import World, Spawner
+
 
 
 def new_tree():
@@ -135,14 +142,15 @@ def new_wrench():
 
 
 def new_bullet(parent, team, direction, Range):
-    return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, 1, 1.25, team, None, 2, direction, Range, parent=parent, post_func=spawn_poof, blockable=True)
+    return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, 1, 1.25, team, None, 2, direction, Range, parent=parent,
+                      post_func=spawn_poof, blockable=True)
 
 def single_shot(world, parent, team, direction):
-    assets.play_sound(assets.random_shoot_sfx())
+    assets.play_sound(assets.random_shoot_sfx(), dist=Vec.dist(player.pos, parent.pos))
     world.add(parent.pos, new_bullet(parent, team, direction, 450))
 
 def shotgun_shot(world, parent, team, direction):
-    assets.play_sound(assets.SFX_SHOOT_SG)
+    assets.play_sound(assets.SFX_SHOOT_SG, dist=Vec.dist(player.pos, parent.pos))
     total_spread = 35
     count = 3
     current_angle = -total_spread/2
@@ -153,12 +161,12 @@ def shotgun_shot(world, parent, team, direction):
         current_angle += total_spread / (count - 1)
 
 def arrow_shot(world, parent, team, direction):
-    assets.play_sound(assets.SFX_SHOOT_ARROW)
+    assets.play_sound(assets.SFX_SHOOT_ARROW, dist=Vec.dist(player.pos, parent.pos))
     arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.8, team, None, 2, direction, 650, parent=parent, post_func=spawn_poof, blockable=False)
     world.add(parent.pos, arrow)
 
 def grenade_shot(world, parent, team, direction):
-    assets.play_sound(assets.SFX_SHOOT_GRENADE)
+    assets.play_sound(assets.SFX_SHOOT_GRENADE, dist=Vec.dist(player.pos, parent.pos))
     g = Projectile("Grenade", assets.IMG_GRENADE, 0.2, 1, team, None, 2, direction, 400, parent=parent,
                        post_func=spawn_explosion, blockable=True)
     world.add(parent.pos, g)
@@ -168,7 +176,7 @@ def spawn_grave(self, world, team):
     world.add(self.pos, Entity("Grave", assets.IMG_GRAVE, 0.35, health=None, team=team, solid=True))
 
 def spawn_explosion(self, world, team):
-    assets.play_sound(assets.SFX_BOOM)
+    assets.play_sound(assets.SFX_BOOM, dist=Vec.dist(player.pos, self.pos))
     explosion = Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0, team, None, 2, Vec(0, 1), 100)
     explosion.lifetime = 200
     world.add(self.pos, explosion)
@@ -454,7 +462,7 @@ if __name__ == "__main__":
 
         cave_entrance = Portal("Cave", assets.IMG_CAVE, 1, solid=True, hitbox_size=Vec(260, 140),
                                hover_message="Enter Cave? (SPACE)")
-        overworld.add(Vec(1500, 1500), cave_entrance)
+        overworld.add(Vec(2000, 2000), cave_entrance)
 
         for i in range(15):
             overworld.add(overworld.rand_pos(), new_rock())
@@ -589,7 +597,6 @@ if __name__ == "__main__":
 
 
             if powerups[invis] > 0:
-                print("once")
                 player.set_image(assets.IMG_PLAYER_INVIS)
             elif powerups[metalsuit] > 0:
                 player.set_image(assets.IMG_PLAYER_METALSUIT)
@@ -623,7 +630,7 @@ if __name__ == "__main__":
             # Clear overlay, which is sometimes used by entities
             if current_world is cave_world or current_world is forest_world:
                 # Make lighting darker in certain worlds
-                overlay.fill((0, 0, 0, 100))
+                overlay.fill((0, 0, 0, 60))
             else:
                 overlay.fill((0, 0, 0, 0))
 
