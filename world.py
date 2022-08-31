@@ -4,10 +4,11 @@ from vector import Vec
 import util
 from globals import Globals
 import assets
+from entity import *
 
 
 class World:
-    def __init__(self, name, size, outer_color, inner_color=None, image=None, music=None):
+    def __init__(self, name, size, outer_color, inner_color=None, dark=False, image=None, music=None):
         self.name = name
         self.size = size
         self.bg_surface = pygame.Surface(size.tuple(), pygame.SRCALPHA, 32)
@@ -15,6 +16,7 @@ class World:
         #self.fg_surface = pygame.Surface((size + self.border).tuple(), pygame.SRCALPHA, 32)
         self.outer_color, = outer_color,
         self.inner_color, = inner_color,
+        self.dark = dark
         self.image = image
 
         rect = util.rect_center(size/2, size)
@@ -25,7 +27,10 @@ class World:
 
         self.entities = []
         self.spawners = []
-        self.completed = False
+        self.dungeons = []
+
+        self.enemies = set([])
+        self.allies = set([])
 
         self.music = music
 
@@ -41,22 +46,40 @@ class World:
         surface.blit(self.bg_surface, pos.tuple())
         #surface.blit(self.fg_surface, pos.tuple())
 
-    def add(self, pos, entity):
-        self.entities.append(entity)
-        entity.world = self
-        entity.pos = Vec(pos)
+    def add(self, pos, e):
+        self.entities.append(e)
+        e.world = self
+        e.pos = Vec(pos)
 
-    def remove(self, entity):
-        if entity in self.entities:
-            self.entities.remove(entity)
+        if not isinstance(e, Projectile):
+            if e.team == ENEMY:
+                self.enemies.add(e)
+            elif e.team == ALLY and not e.is_player:
+                self.allies.add(e)
+                print(e)
+
+    def remove(self, e):
+        if e in self.entities:
+            self.entities.remove(e)
+
+            # remove from enemies and allies in case the entity was in those sets
+            # sets are nice because you don't have to check if something's there to try to remove it
+            self.enemies.discard(e)
+            self.allies.discard(e)
+
             for spawner in self.spawners:
                 for spawn in spawner.spawned:
-                    if spawn == entity:
-                        spawner.spawned.remove(entity)
+                    if spawn == e:
+                        spawner.spawned.remove(e)
 
     def add_spawner(self, spawner):
         self.spawners.append(spawner)
         spawner.init(self)
+
+    def add_dungeon(self, pos, entrance):
+        self.add(pos, entrance)
+        self.dungeons.append(entrance)
+
 
     def rand_pos(self):
         return Vec(random.randint(0, self.size.x), random.randint(0, self.size.y))

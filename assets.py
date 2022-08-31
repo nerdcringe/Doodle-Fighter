@@ -39,6 +39,7 @@ MAIN_FONT = font_path("StayPuft.ttf")
 
 MUSIC_OVERWORLD = load_music("overworld.wav")
 MUSIC_FOREST = load_music("forest.wav")
+MUSIC_CAVE = load_music("cave.wav")
 
 sfx = []
 SFX_HIT_1 = load_sfx("hit_1.wav", 0.2)
@@ -46,10 +47,14 @@ SFX_HIT_2 = load_sfx("hit_2.wav")
 SFX_HIT_3 = load_sfx("hit_3.wav", 0.3)
 SFX_SHOOT_1 = load_sfx("shoot_1.wav", 0.45)
 SFX_SHOOT_2 = load_sfx("shoot_2.wav", 0.45)
-SFX_SHOOT_SG = load_sfx("shoot_sg.wav", 0.3)
+SFX_SHOOT_SG = load_sfx("shoot_sg.wav", 0.15)
 SFX_SHOOT_ARROW = load_sfx("shoot_arrow.wav")
 SFX_SHOOT_GRENADE = load_sfx("shoot_grenade.wav", 0.5)
 SFX_BOOM = load_sfx("boom.wav", 0.3)
+
+SFX_COLLECT = load_sfx("collect.wav", 0.4)
+SFX_BUFF = load_sfx("buff.wav", 0.8)
+SFX_EAT = load_sfx("eat.wav", 1)
 
 SFX_OW_PLAYER = load_sfx("ow_player.wav", 0.8)
 
@@ -60,16 +65,32 @@ def random_shoot_sfx():
     return random.choice((SFX_SHOOT_1, SFX_SHOOT_2))
 
 
-def play_sound(sound, dist=0, pan=0):
+def play_sound_old(sound, dist=None):
     if Globals.sound_on:
         played_sound = sound.play()
-        volume = 1 - (dist/1000)
-        played_sound.set_volume(min(1, volume))
+
+        if play_sound is not None and dist is not None:
+            volume = 1 - (dist / 1000)
+            played_sound.set_volume(min(1, volume))
 
         """if pan != 0:
             volume = sound.get_volume()
             played_sound.set_volume(volume + pan, volume - pan)"""
 
+
+def play_sound(sound, pos=None, player_pos=None):
+    if Globals.sound_on:
+        played_sound = sound.play()
+
+        if played_sound is not None:
+            if pos is not None and player_pos is not None:
+                dist = pos.dist(player_pos)
+                volume = 1 - (dist / 1000)
+                played_sound.set_volume(min(1, volume))
+
+        """if pan != 0:
+            volume = sound.get_volume()
+            played_sound.set_volume(volume + pan, volume - pan)"""
 
 
 IMG_CURSOR_ARROW = load_image("ui_cursor_arrow.png")
@@ -94,7 +115,7 @@ IMG_BOOMER = load_image("boomer.png")
 IMG_CAR_FRONT = load_image("car_front.png")
 IMG_CAR_SIDE = load_image("car_side.png")
 
-IMG_ALLY = load_image("ally.png")
+IMG_TROOP = load_image("troop.png")
 
 
 IMG_PROJECTILE_BULLET = load_image("projectile_bullet.png")
@@ -107,6 +128,7 @@ IMG_TREE = load_image("tree.png")
 IMG_TREE_CITY = load_image("tree_city.png")
 IMG_TREE_WINTER = load_image("tree_winter.png")
 IMG_ROCK = load_image("rock.png")
+IMG_STREET_LIGHT = load_image("street_light.png")
 
 IMG_GRAVE = load_image("grave.png")
 IMG_OFFICE = load_image("office.png")
