@@ -49,6 +49,7 @@ class Entity:
         self.time = 0  # Total time alive in world
         self.lifetime = -1  # The amount of time able to live before dying. The default value -1 means live forever
         self.alive = True
+        self.frozen_timer = 0
 
         default_image_size = Vec(image.get_size()) * image_scale
 
@@ -93,6 +94,15 @@ class Entity:
 
         surface.blit(self.surface, render_rect)
 
+        if self.frozen_timer > 0:
+            ice_cube_image = util.scale_image(assets.IMG_ICE_CUBE, self.image_scale + 0.1)
+            render_rect = hitbox.copy()
+            # Render image in center of hitbox
+            render_rect.x += (self.size.x - ice_cube_image.get_size()[0])/2
+            render_rect.y += (self.size.y - ice_cube_image.get_size()[1])/2
+
+            surface.blit(ice_cube_image, render_rect)
+
         # Draw health bar
         if self.is_player or not self.invincible:
             if self.health < self.max_health:
@@ -115,8 +125,17 @@ class Entity:
     def update(self, world, player):
         self.time += Globals.delta_time
 
+        if self.frozen_timer > 0:
+            self.frozen_timer -= Globals.delta_time
+            self.frozen_timer = max(self.frozen_timer, 0)
+
         if self.vel.mag() > self.speed:
             self.vel = self.vel.norm() * self.speed
+
+        if self.frozen_timer > 0:
+            self.vel *= 0.25  # Slow down when frozen
+
+        # Scale movement with time so lag doesn't actually slow you down
         self.pos += self.vel * Globals.delta_time
 
         # keep entity within world bounds (stays a "radius" length from wall) if it is able to move
@@ -255,7 +274,7 @@ class AIEntity(Entity):
         return opposes(self, other) and self.in_range(other) and not (self.team == ALLY and other.team == NEUTRAL)
 
     def can_spread(self, other):
-        return self is not other and self.team is other.team and other.health > 0 and self.in_range(other)
+        return self is not other and ((self.team is other.team and other.health > 0 and self.in_range(other)) or other.team == NEUTRAL)
 
     def wander(self, world):
         if random.random() < 0.005:
@@ -326,8 +345,9 @@ class RangedAIEntity(AIEntity):
         self.weapon_func = weapon_func
 
     def attack(self, target_direction, world):
-        self.weapon_func(world, self, self.team, target_direction)
-        self.atk_timer = 0
+        if self.frozen_timer <= 0:
+            self.weapon_func(world, self, self.team, target_direction)
+            self.atk_timer = 0
 
     def retreat(self, target, target_direction):
         # Keep at a certain radius target_direction from player
@@ -340,7 +360,7 @@ class RangedAIEntity(AIEntity):
 
 class Projectile(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, direction, Range, parent=None,
-                 blockable=True, rotate=True, death_func=None):
+                 blockable=True, rotate=True, death_func=None, collide_func=None):
         super().__init__(name, image, image_scale, team, health, death_func=death_func)
         self.speed = speed
         self.damage = damage
@@ -349,13 +369,15 @@ class Projectile(Entity):
         if rotate:
             self.rotate(self.vel.angle())
         self.blockable = blockable
+        self.collide_func = collide_func
 
-        if parent is None:
+        self.parent = parent
+        if self.parent is None:
             self.init_vel = Vec(0, 0)
         else:
-            if parent.is_player:
-                self.damage *= parent.damage_multiplier
-            self.init_vel = parent.vel
+            if self.parent.is_player:
+                self.damage *= self.parent.damage_multiplier
+            self.init_vel = parent.vel  # Transfer parent velocity to the projectile
         self.vel += self.init_vel
         self.distance = 0
 
@@ -385,24 +407,30 @@ class Projectile(Entity):
 
     def collide(self, other, world):
         super().collide(other, world)
-        opposed = opposes(self, other) and other not in self.last_collisions
+        opposed = opposes(self, other)
+        if other not in self.last_collisions:
+            # Free allies from ice when shooting them
+            if not opposed and other.frozen_timer > 0 and other is not self.parent:
+                other.frozen_timer = 0
+                other.shake_timer = 150
+            if opposed or other.solid:
+                other.shake_timer = 150
+                if opposed:
+                    if self.collide_func is not None:
+                        self.collide_func(self, other)
+                    damage = self.damage
+                    if other.is_player:
+                        assets.play_sound(assets.SFX_OW_PLAYER, self.pos, other.pos)
+                        if other.invincible:
+                            self.alive = False # Remove if deflected by metalsuit invincibility powerup
+                    other.hurt(damage, world)
 
-        if opposed or other.solid:
-            other.shake_timer = 150
-            if opposed:
-                damage = self.damage
-                if other.is_player:
-                    assets.play_sound(assets.SFX_OW_PLAYER, self.pos, other.pos)
-                    if other.invincible:
-                        self.alive = False # Remove if deflected by metalsuit invincibility powerup
-                other.hurt(damage, world)
-
-            if other.take_knockback:
-                other.accel((other.pos - self.pos) * 10)
-            if self.blockable:
-                if self.death_func is not None:
-                    self.death_func(self, world, self.team)
-                self.alive = False
+                if other.take_knockback:
+                    other.accel((other.pos - self.pos) * 10)
+                if self.blockable:
+                    if self.death_func is not None:
+                        self.death_func(self, world, self.team)
+                    self.alive = False
 
 
 class Item(Entity):

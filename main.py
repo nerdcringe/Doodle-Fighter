@@ -51,29 +51,16 @@ def new_street_light():
                   death_func=None)
 
 
-def new_dungeon(entrance, dungeon_world):
+def new_dungeon(entrance, dungeon_world, enemy_sets):
     door = Portal("Door", assets.IMG_DOOR, 0.8, to_entity=entrance) # Exiting the door sends player outside the dungeon
     dungeon_world.add(Vec(dungeon_world.size.x/2, -60), door)
 
     entrance.to_entity = door  # Set dungeon destination to the door inside the dungeon
 
-    chance = random.randint(1, 6)
-    if chance == 1:
-        dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_ranger_boss())
-    elif chance == 2:
-        dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_brawler_boss())
-    elif chance == 3:
-        for i in range(2):
-            dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_zoomer())
-    elif chance == 4:
-        for i in range(3):
-            dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_boomer())
-    elif chance == 5:
-        for i in range(3):
-            dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_ranger())
-    else:
-        for i in range(4):
-            dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_brawler())
+    chosen_set = random.choice(enemy_sets)
+
+    for i in range(chosen_set[0]): # 0 index is amount to spawn
+        dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), chosen_set[1]())  # 1 index is the type of enemy
 
     return entrance
 
@@ -81,19 +68,22 @@ def new_dungeon(entrance, dungeon_world):
 def new_brawler():
     return AIEntity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, death_func=brawler_loot)
 
+def new_cold_brawler():
+    return AIEntity("Brawler", assets.IMG_BRAWLER_COLD, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, death_func=brawler_loot)
+
 def new_brawler_boss():
-    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.6, ENEMY, 50, 3, 2000, 0.04, 2000, 225,
+    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.6, ENEMY, 50, 3, 2000, 0.035, 1000, 225,
                     hitbox_size=Vec(128, 128), death_func=brawler_boss_loot)
     boss.take_knockback = False
     return boss
 
 def new_ranger():
-    return RangedAIEntity("Ranger", assets.IMG_RANGER, 0.25, 0.35, ENEMY, health=4, damage=1, sight_range=700,
+    return RangedAIEntity("Ranger", assets.IMG_RANGER, 0.25, speed=0.4, team=ENEMY, health=4, damage=1, sight_range=700,
                           follow_weight=0.08, atk_interval=2000, retreat_range=350, weapon_func=arrow_shot,
                           death_func=ranger_loot, hitbox_size=Vec(64, 64))
 
 def new_ranger_boss():
-    return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, 0.3, ENEMY, health=40, damage=1, sight_range=600,
+    return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, speed=0.5, team=ENEMY, health=40, damage=1, sight_range=800,
                           follow_weight=0.05, atk_interval=1000, retreat_range=350, weapon_func=arrow_shot,
                           death_func=ranger_boss_loot, hitbox_size=Vec(100, 100))
 
@@ -102,8 +92,8 @@ def new_boomer():
                           weapon_func=grenade_shot, death_func=boomer_loot, hitbox_size=Vec(70, 70))
 
 def new_zoomer():
-    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.65, team=ENEMY, health=6, damage=2, sight_range=350,
-                          follow_weight=0.03, atk_interval=250, retreat_range=250,
+    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.55, team=ENEMY, health=6, damage=2, sight_range=300,
+                          follow_weight=0.05, atk_interval=300, retreat_range=200,
                           weapon_func=single_shot, death_func=zoomer_loot, hitbox_size=Vec(70, 70))
 
 def new_car():
@@ -114,7 +104,18 @@ def new_car():
     car.left_image = pygame.transform.flip(car.right_image, True, False)
     return car
 
-def new_troop():
+def new_cooler():
+    return RangedAIEntity("Cooler", assets.IMG_COOLER, 0.4, speed=0.45, team=ENEMY, health=8, damage=1, sight_range=400,
+                          follow_weight=0.05, atk_interval=6000, retreat_range=300, weapon_func=freeze_ray_shot,
+                          death_func=cooler_loot, hitbox_size=Vec(80, 80))
+
+def new_freezer():
+    return RangedAIEntity("Freezer", assets.IMG_FREEZER, 0.7, speed=0.5, team=ENEMY, health=40, damage=1, sight_range=400,
+                          follow_weight=0.03, atk_interval=4500, retreat_range=400, weapon_func=freeze_ray_shot,
+                          death_func=freezer_loot, hitbox_size=Vec(140, 170))
+
+
+def new_ally_troop():
     return RangedAIEntity("Troop", assets.IMG_TROOP, 0.275, 0.4, ALLY, 8, 1, sight_range=600, follow_weight=0.05,
                           atk_interval=1500, retreat_range=350, weapon_func=single_shot, hitbox_size=Vec(64, 64))
 
@@ -137,6 +138,9 @@ def new_arrows_item():
 
 def new_grenade_item():
     return Item("Grenade", assets.IMG_GRENADE, 0.25, lambda: gain_powerup(grenade))
+
+def new_freeze_ray_item():
+    return Item("Freeze Ray", assets.IMG_FREEZE_RAY, 0.25, lambda: gain_powerup(freeze_ray))
 
 def new_speed_item():
     return Item("Speed Shoes", assets.IMG_SPEED_SHOES, 0.25, lambda: gain_powerup(speed_shoes))
@@ -162,7 +166,7 @@ def new_bullet(parent, team, direction, Range):
 
 def single_shot(world, parent, team, direction):
     assets.play_sound(assets.random_shoot_sfx(), parent.pos, player.pos)
-    world.add(parent.pos, new_bullet(parent, team, direction, 450))
+    world.add(parent.pos, new_bullet(parent, team, direction, 500))
 
 def shotgun_shot(world, parent, team, direction):
     assets.play_sound(assets.SFX_SHOOT_SG, parent.pos, player.pos)
@@ -186,15 +190,31 @@ def grenade_shot(world, parent, team, direction):
                    death_func=spawn_explosion, blockable=True)
     world.add(parent.pos, g)
 
+def freeze_ray_shot(world, parent, team, direction):
+    assets.play_sound(assets.SFX_SHOOT_GRENADE, parent.pos, player.pos)
+    s = Projectile("Freeze Ray Shot", assets.IMG_PROJECTILE_SNOWFLAKE, 0.4, 1.5, team, None, 2, direction, 400, parent=parent,
+                   death_func=spawn_frozen_cloud, blockable=True)
+    world.add(parent.pos, s)
 
 def spawn_grave(self, world, team):
     world.add(self.pos, Entity("Grave", assets.IMG_GRAVE, 0.35, health=50, team=team, solid=True, death_func=spawn_explosion))
 
 def spawn_explosion(self, world, team):
     assets.play_sound(assets.SFX_BOOM, self.pos, player.pos)
-    explosion = Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.3, team, None, 2, self.vel, 1000, blockable=False)
+    explosion = Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.3, team, None, 2, self.vel, 1000, blockable=False, rotate=False)
     explosion.lifetime = 200
     world.add(self.pos, explosion)
+
+def freeze(self, other):
+    if other.speed > 0: # Only freeze entities that can move
+        other.frozen_timer = 3000
+
+def spawn_frozen_cloud(self, world, team):
+    assets.play_sound(assets.SFX_FREEZE, self.pos, player.pos)
+    cloud = Projectile("Frozen Cloud", assets.IMG_FROZEN_CLOUD, 0.6, 0.3, team, None, 1, self.vel, 1000,
+                       blockable=False, rotate=False, collide_func=freeze)
+    cloud.lifetime = 400
+    world.add(self.pos, cloud)
 
 def spawn_poof(self, world, team):
     poof = Entity("Poof", assets.IMG_POOF, 1, 0.01, NEUTRAL)
@@ -204,48 +224,69 @@ def spawn_poof(self, world, team):
     #world.add(self.pos, Projectile("Poof", assets.IMG_POOF, 0.25, 0.75, NEUTRAL, None, 0, self.vel, 20, blockable=False, parent=self, rotate=False))
 
 
+def drop_item(pos, item, world):
+    world.add(pos + Vec.polar(35, random.randint(0, 360)), item)
+    item.keep_in_bounds(world)
+
 def tree_loot(self, world, team):
     if random.randint(0, 1):
-        world.add(self.pos, new_apple_item())
+        drop_item(self.pos, new_apple_item(), world)
 
 def brawler_loot(self, world, team):
     if random.random() < 0.25:
         loot = random.choice((new_shotgun_item, new_speed_item))
-        world.add(self.pos, loot())
+        drop_item(self.pos, loot(), world)
+    if random.random() < 0.1:
+        drop_item(self.pos, new_troops_item(), world)
 
 def ranger_loot(self, world, team):
     if random.random() < 0.25:
         loot = random.choice((new_arrows_item, new_invis_item, new_apple_item))
-        world.add(self.pos, loot())
+        drop_item(self.pos, loot(), world)
+    if random.random() < 0.1:
+        drop_item(self.pos, new_troops_item(), world)
 
 def boomer_loot(self, world, team):
     spawn_explosion(self, world, team)
-    if random.random() < 0.15:
+    if random.random() < 0.2:
         loot = random.choice((new_grenade_item,))
-        world.add(self.pos, loot())
+        drop_item(self.pos, loot(), world)
+    if random.random() < 0.2:
+        drop_item(self.pos, new_troops_item(), world)
 
 def zoomer_loot(self, world, team):
     spawn_explosion(self, world, team)
     if random.random() < 0.15:
         loot = random.choice((new_metalsuit_item, new_shield_item))
-        world.add(self.pos, loot())
+        drop_item(self.pos, loot(), world)
+    if random.random() < 0.2:
+        drop_item(self.pos, new_troops_item(), world)
 
 def car_loot(self, world, team):
     spawn_explosion(self, world, team)
     if random.random() < 0.3:
-        loot = random.choice((new_metalsuit_item, new_troops_item))
-        world.add(self.pos, loot())
+        drop_item(self.pos, new_metalsuit_item(), world)
+    if random.random() < 0.1:
+        drop_item(self.pos, new_troops_item(), world)
 
 def brawler_boss_loot(self, world, team):
     loot = random.choice((new_shield_item, new_dmg_up_item))
-    world.add(self.pos, loot())
+    drop_item(self.pos, loot(), world)
 
 def ranger_boss_loot(self, world, team):
+    drop_item(self.pos, new_arrows_item(), world)
+    drop_item(self.pos, new_invis_item(), world)
+    drop_item(self.pos, new_apple_item(), world)
 
-    world.add(self.pos + Vec.polar(35, 0), new_arrows_item())
-    world.add(self.pos + Vec.polar(35, 120), new_invis_item())
-    world.add(self.pos + Vec.polar(35, 240), new_apple_item())
+def cooler_loot(self, world, team):
+    if random.random() < 0.5:
+        drop_item(self.pos, new_freeze_ray_item(), world)
+    if random.random() < 0.1:
+        drop_item(self.pos, new_troops_item(), world)
 
+def freezer_loot(self, world, team):
+    drop_item(self.pos, new_freeze_ray_item(), world)
+    drop_item(self.pos, new_metalsuit_item(), world)
 
 Globals.cursor_img = assets.IMG_CURSOR_TARGET
 
@@ -390,11 +431,15 @@ def debug(key, mouse_world_pos):
     elif key == pygame.K_QUOTE:
         current_world.add(mouse_world_pos, new_car())
     elif key == pygame.K_h:
-        current_world.add(mouse_world_pos, new_troop())
+        current_world.add(mouse_world_pos, new_ally_troop())
     elif key == pygame.K_t:
         current_world.add(mouse_world_pos, new_ranger_boss())
     elif key == pygame.K_y:
         current_world.add(mouse_world_pos, new_zoomer())
+    elif key == pygame.K_u:
+        current_world.add(mouse_world_pos, new_cooler())
+    elif key == pygame.K_i:
+        current_world.add(mouse_world_pos, new_freezer())
 
     elif key == pygame.K_1:
         current_world.add(mouse_world_pos, new_apple_item())
@@ -417,6 +462,8 @@ def debug(key, mouse_world_pos):
         current_world.add(mouse_world_pos, new_invis_item())
     elif key == pygame.K_0:
         current_world.add(mouse_world_pos, new_troops_item())
+    elif key == pygame.K_MINUS:
+        current_world.add(mouse_world_pos, new_freeze_ray_item())
 
     elif key == pygame.K_v:
         Globals.debug_mode = not Globals.debug_mode
@@ -447,9 +494,11 @@ if __name__ == "__main__":
         restart = False
         frames = 0
 
-        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 15000)
-        arrows = Powerup("Arrows", assets.IMG_ARROWS, 20000)
+
+        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 12000)
+        arrows = Powerup("Arrows", assets.IMG_ARROWS, 15000)
         grenade = Powerup("Grenade", assets.IMG_GRENADE, 15000)
+        freeze_ray = Powerup("Freeze Ray", assets.IMG_FREEZE_RAY, 10000)
         speed_shoes = Powerup("Speed", assets.IMG_SPEED_SHOES, 10000)
         invis = Powerup("Invis", assets.IMG_PLAYER_INVIS, 8000)
         metalsuit = Powerup("Metalsuit", assets.IMG_METALSUIT, 10000)
@@ -459,12 +508,19 @@ if __name__ == "__main__":
             shotgun: 0,
             arrows: 0,
             grenade: 0,
+            freeze_ray: 0,
             speed_shoes: 0,
             metalsuit: 0,
             invis: 0,
         }
 
-        placeable_troops = 5
+        last_shoot_time = 0
+        last_shotgun_time = 0
+        last_arrow_time = 0
+        last_grenade_time = 0
+        last_freeze_ray_time = 0
+
+        placeable_troops = 3
 
 
         worlds = []
@@ -475,11 +531,11 @@ if __name__ == "__main__":
         city = World("Cityworld", Vec(2500, 2500), (100, 200, 150), (175, 175, 175))#image=assets.IMG_BG_CITY)
         worlds.append(city)
 
+        frostland = World("Frostland", Vec(2500, 3000), (200, 240, 250), (150, 220, 230))
+        worlds.append(frostland)
+
         forest = World("Forestworld", Vec(2250, 2250), (13, 46, 37), (38, 75, 60), dark=True, music=assets.MUSIC_FOREST)
         worlds.append(forest)
-
-        pinkland = World("Pinkland", Vec(4000, 1750), (245, 0, 204), (237, 133, 195))
-        worlds.append(pinkland)
 
         island = World("Island", Vec(3000, 1500), (45, 149, 180), (195, 179, 94))
         worlds.append(island)
@@ -505,29 +561,36 @@ if __name__ == "__main__":
             overworld.add(overworld.rand_pos(), new_rock())
 
         overworld.add_spawner(Spawner(8000, new_tree, max_num=12, center_spread=1.25, pre_spawned=12))
-        overworld.add_spawner(Spawner(4000, new_brawler, max_num=6))
+        overworld.add_spawner(Spawner(5000, new_brawler, max_num=9, max_spawn=3))
         #overworld.add_spawner(Spawner(10000, new_ranger, max_num=3))
         overworld.add_spawner(Spawner(45000, new_brawler_boss, max_num=1))
 
-
         for i in range(5):
             size = Vec(random.randint(700, 1250), random.randint(750, 1250))
-            entrance = Portal("House", assets.IMG_HOUSE, 1, hitbox_size=Vec(180, 220), solid=True)
-            house_world = World("House world #" + str(i), size, (30, 30, 20), (70, 65, 60), dark=True, solid_border=True)
-            overworld.add_dungeon(overworld.rand_pos(), new_dungeon(entrance, house_world))
+            entrance = Portal("House", assets.IMG_HOUSE, 0.9, hitbox_size=Vec(160, 220), solid=True)
+            house_world = World("House world #" + str(i), size, (100, 55, 36), (185, 153, 110), solid_border=True)
+            enemy_sets = ((4, new_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss), (1, new_ranger_boss))
+            overworld.add_dungeon(overworld.rand_pos(), new_dungeon(entrance, house_world, enemy_sets))
 
 
         for i in range(8):
             city.add(overworld.rand_pos(), new_street_light())
         for i in range(5):
-            size = Vec(random.randint(600, 800), random.randint(600, 800))
             entrance = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(150, 185), solid=True)
+            size = Vec(random.randint(600, 800), random.randint(600, 800))
             office_world = World("Office world #" + str(i), size, (91, 108, 120), (191, 180, 147), solid_border=True)
-            city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world))
+            enemy_sets = ((4, new_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss), (1, new_ranger_boss), (2, new_zoomer))
+            city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world, enemy_sets))
 
         #city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
         city.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=8))
         city.add_spawner(Spawner(0, new_car, max_num=3, pre_spawned=3))
+
+
+        frostland.add_spawner(Spawner(6000, new_winter_tree, max_num=6, center_spread=2, pre_spawned=10))
+        frostland.add_spawner(Spawner(5000, new_cold_brawler, max_num=6, max_spawn=2))
+        frostland.add_spawner(Spawner(7500, new_cooler, max_num=3, max_spawn=1))
+        frostland.add_spawner(Spawner(20000, new_freezer, max_num=2, max_spawn=1))
 
 
         for i in range(8):
@@ -543,8 +606,16 @@ if __name__ == "__main__":
         #cave_entrance.to_world = cave_world
         cave_entrance.to_entity = cave_exit
 
-
         caveworld.add_spawner(Spawner(3000, new_brawler_boss, max_num=4, pre_spawned=1))
+
+
+        for i in range(5):
+            entrance = Portal("Igloo", assets.IMG_IGLOO, 0.85, hitbox_size=Vec(185, 185), solid=True)
+            size = Vec(random.randint(500, 700), random.randint(500, 700))
+            igloo_world = World("Igloo #" + str(i), size, (200, 240, 250), (150, 220, 230), solid_border=True)
+            enemy_sets = ((4, new_cold_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss), (1, new_ranger_boss),
+                          (2, new_zoomer), (3, new_cooler), (1, new_freezer))
+            frostland.add_dungeon(frostland.rand_pos(), new_dungeon(entrance, igloo_world, enemy_sets))
 
 
         while not restart:
@@ -553,6 +624,7 @@ if __name__ == "__main__":
 
             keys_pressed = pygame.key.get_pressed()
             interact = False
+            mouse_down = False
             MOUSE_POS = Vec(pygame.mouse.get_pos())
             MOUSE_WORLD_POS = world_pos(MOUSE_POS)
 
@@ -565,34 +637,17 @@ if __name__ == "__main__":
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 3:
                         if placeable_troops > 0:
-                            current_world.add(MOUSE_WORLD_POS, new_troop())
+                            current_world.add(MOUSE_WORLD_POS, new_ally_troop())
                             placeable_troops -= 1
 
                     elif event.button == 1:
+                        mouse_down = True
                         if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
                             Globals.sound_on = not Globals.sound_on
 
                         elif player.health > 0:
                             powerups[invis] = 0
-                            default_gun = True
 
-                            if powerups[shotgun] > 0:
-                                shotgun_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                                default_gun = False
-                                deplete_powerup(shotgun, 750)
-
-                            if powerups[arrows] > 0:
-                                arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                                default_gun = False
-                                deplete_powerup(arrows, 750)
-
-                            if powerups[grenade] > 0:
-                                grenade_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                                default_gun = False
-                                deplete_powerup(grenade, 750)
-
-                            if default_gun:
-                                single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
 
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, MOUSE_WORLD_POS)
@@ -606,16 +661,48 @@ if __name__ == "__main__":
                             current_world.start_music()
                         else:
                             pygame.mixer.music.pause()
-
-                    """if event.key == pygame.K_e:
-                        for entity in player.last_collisions:
-                            if entity.name == "House":
-                                set_world(house_world)"""
                     
                 elif event.type == pygame.VIDEORESIZE:
                     Globals.SIZE = Vec(event.size)
                     overlay = pygame.Surface(event.size).convert_alpha()
 
+            if player.health > 0 and pygame.mouse.get_pressed(3)[0]:
+                standard_gun = True
+
+                if powerups[shotgun] > 0:
+                    standard_gun = False
+                    if pygame.time.get_ticks() - last_shotgun_time > 400:
+                        shotgun_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                        deplete_powerup(shotgun, 750)  # Deplete powerups extra when they are used
+                        last_shotgun_time = pygame.time.get_ticks()
+
+                if powerups[arrows] > 0:
+                    standard_gun = False
+                    if pygame.time.get_ticks() - last_arrow_time > 250:
+                        arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                        deplete_powerup(arrows, 500)
+                        last_arrow_time = pygame.time.get_ticks()
+
+                if powerups[grenade] > 0:
+                    standard_gun = False
+                    if pygame.time.get_ticks() - last_grenade_time > 400:
+                        grenade_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                        deplete_powerup(grenade, 1000)
+                        last_grenade_time = pygame.time.get_ticks()
+
+                if powerups[freeze_ray] > 0:
+                    standard_gun = False
+                    if pygame.time.get_ticks() - last_freeze_ray_time > 400:
+                        freeze_ray_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                        deplete_powerup(freeze_ray, 1000)
+                        last_freeze_ray_time = pygame.time.get_ticks()
+
+                if standard_gun and pygame.time.get_ticks() - last_shoot_time > 250:
+                    single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                    last_shoot_time = pygame.time.get_ticks()
+
+
+            # Destroy dungeons whose enemies have been defeated
             for dungeon in current_world.dungeons:
                 if len(dungeon.destination_world().enemies) == 0:
                     dungeon.world.remove(dungeon)
@@ -623,9 +710,11 @@ if __name__ == "__main__":
                     spawn_explosion(dungeon, dungeon.world, team=player)
 
 
+            # Automatically deplete powerups as time goes on
             deplete_powerup(shotgun, Globals.delta_time)
             deplete_powerup(grenade, Globals.delta_time)
             deplete_powerup(arrows, Globals.delta_time)
+            deplete_powerup(freeze_ray, Globals.delta_time)
             deplete_powerup(invis, Globals.delta_time)
             deplete_powerup(metalsuit, Globals.delta_time)
 
