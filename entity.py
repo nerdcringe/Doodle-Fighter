@@ -130,8 +130,7 @@ class Entity:
 
     def keep_in_bounds(self, world):
         self.pos.x = util.clamp(self.pos.x, self.size.x/2, world.size.x - self.size.x/2)
-
-        # Keep bottom 20 pixels inside the world boundaries instead of the entire entity
+        # Keep bottom pixels inside the world boundaries instead of the entire entity
         # This simulates the depth of the entity, maintaining the illusion of 3D
         self.pos.y = util.clamp(self.pos.y, -self.size.y/2 + 20, world.size.y - self.size.y/2)
 
@@ -370,16 +369,19 @@ class Projectile(Entity):
         ground_size = world.size/2
         x, y = self.pos.x, self.pos.y
         w, h = self.size.x, self.size.y
+
         # wall_dist > 0 when outer edge of sprite is outside world border
-        hits_border = x <= w/2\
-                    or y <= h/2 + 5\
-                    or x >= world.size.x - w/2\
-                    or y >= world.size.y - h/2
+        hits_border = world.solid_border and \
+                    (x <= w/2 or x >= world.size.x - w/2
+                     or y <= h/2 + 5 or y >= world.size.y - h/2)
 
         if self.distance > self.range or hits_border and self.time > 0:
             if self.death_func is not None:
                 self.death_func(self, world, self.team)
             self.alive = False
+
+    def keep_in_bounds(self, world):
+        pass
 
     def collide(self, other, world):
         super().collide(other, world)

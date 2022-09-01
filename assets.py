@@ -112,6 +112,7 @@ IMG_BRAWLER_BOSS = load_image("brawler_boss.png")
 IMG_RANGER = load_image("ranger.png")
 IMG_RANGER_BOSS = load_image("ranger_boss.png")
 IMG_BOOMER = load_image("boomer.png")
+IMG_ZOOMER = load_image("zoomer.png")
 IMG_CAR_FRONT = load_image("car_front.png")
 IMG_CAR_SIDE = load_image("car_side.png")
 

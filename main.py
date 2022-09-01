@@ -57,15 +57,18 @@ def new_dungeon(entrance, dungeon_world):
 
     entrance.to_entity = door  # Set dungeon destination to the door inside the dungeon
 
-    chance = random.random()
-    if chance < 0.2:
+    chance = random.randint(1, 6)
+    if chance == 1:
         dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_ranger_boss())
-    elif chance < 0.4:
+    elif chance == 2:
         dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_brawler_boss())
-    elif chance < 0.6:
+    elif chance == 3:
+        for i in range(2):
+            dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_zoomer())
+    elif chance == 4:
         for i in range(3):
             dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_boomer())
-    elif chance < 0.8:
+    elif chance == 5:
         for i in range(3):
             dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), new_ranger())
     else:
@@ -92,11 +95,16 @@ def new_ranger():
 def new_ranger_boss():
     return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, 0.3, ENEMY, health=40, damage=1, sight_range=600,
                           follow_weight=0.05, atk_interval=1000, retreat_range=350, weapon_func=arrow_shot,
-                          death_func=ranger_loot, hitbox_size=Vec(100, 100))
+                          death_func=ranger_boss_loot, hitbox_size=Vec(100, 100))
 
 def new_boomer():
     return RangedAIEntity("Boomer", assets.IMG_BOOMER, 0.3, 0.25, ENEMY, 8, 1, 400, 0.05, 3000, 250,
                           weapon_func=grenade_shot, death_func=boomer_loot, hitbox_size=Vec(70, 70))
+
+def new_zoomer():
+    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.65, team=ENEMY, health=6, damage=2, sight_range=350,
+                          follow_weight=0.03, atk_interval=250, retreat_range=250,
+                          weapon_func=single_shot, death_func=zoomer_loot, hitbox_size=Vec(70, 70))
 
 def new_car():
     car = AIEntity("Car", assets.IMG_CAR_FRONT, 0.5, 0.5, ENEMY, health=14, damage=2, sight_range=300, follow_weight=0.1,
@@ -207,13 +215,19 @@ def brawler_loot(self, world, team):
 
 def ranger_loot(self, world, team):
     if random.random() < 0.25:
-        loot = random.choice((new_arrows_item, new_invis_item))
+        loot = random.choice((new_arrows_item, new_invis_item, new_apple_item))
         world.add(self.pos, loot())
 
 def boomer_loot(self, world, team):
     spawn_explosion(self, world, team)
-    if random.random() < 0.25:
+    if random.random() < 0.15:
         loot = random.choice((new_grenade_item,))
+        world.add(self.pos, loot())
+
+def zoomer_loot(self, world, team):
+    spawn_explosion(self, world, team)
+    if random.random() < 0.15:
+        loot = random.choice((new_metalsuit_item, new_shield_item))
         world.add(self.pos, loot())
 
 def car_loot(self, world, team):
@@ -225,6 +239,12 @@ def car_loot(self, world, team):
 def brawler_boss_loot(self, world, team):
     loot = random.choice((new_shield_item, new_dmg_up_item))
     world.add(self.pos, loot())
+
+def ranger_boss_loot(self, world, team):
+
+    world.add(self.pos + Vec.polar(35, 0), new_arrows_item())
+    world.add(self.pos + Vec.polar(35, 120), new_invis_item())
+    world.add(self.pos + Vec.polar(35, 240), new_apple_item())
 
 
 Globals.cursor_img = assets.IMG_CURSOR_TARGET
@@ -373,6 +393,8 @@ def debug(key, mouse_world_pos):
         current_world.add(mouse_world_pos, new_troop())
     elif key == pygame.K_t:
         current_world.add(mouse_world_pos, new_ranger_boss())
+    elif key == pygame.K_y:
+        current_world.add(mouse_world_pos, new_zoomer())
 
     elif key == pygame.K_1:
         current_world.add(mouse_world_pos, new_apple_item())
@@ -425,7 +447,7 @@ if __name__ == "__main__":
         restart = False
         frames = 0
 
-        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 20000)
+        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 15000)
         arrows = Powerup("Arrows", assets.IMG_ARROWS, 20000)
         grenade = Powerup("Grenade", assets.IMG_GRENADE, 15000)
         speed_shoes = Powerup("Speed", assets.IMG_SPEED_SHOES, 10000)
@@ -450,16 +472,20 @@ if __name__ == "__main__":
         overworld = World("Overworld", Vec(2500, 2500), (220, 200, 140), (85, 175, 95), music=assets.MUSIC_OVERWORLD)
         worlds.append(overworld)
 
-        city_world = World("Cityworld", Vec(2500, 2500), (100, 200, 150), (175, 175, 175))#image=assets.IMG_BG_CITY)
-        worlds.append(city_world)
+        city = World("Cityworld", Vec(2500, 2500), (100, 200, 150), (175, 175, 175))#image=assets.IMG_BG_CITY)
+        worlds.append(city)
 
+        forest = World("Forestworld", Vec(2250, 2250), (13, 46, 37), (38, 75, 60), dark=True, music=assets.MUSIC_FOREST)
+        worlds.append(forest)
 
-        forest_world = World("Forestworld", Vec(2250, 2250), (13, 46, 37), (38, 75, 60), dark=True, music=assets.MUSIC_FOREST)
-        worlds.append(forest_world)
+        pinkland = World("Pinkland", Vec(4000, 1750), (245, 0, 204), (237, 133, 195))
+        worlds.append(pinkland)
 
-        cave_world = World("Caveworld", Vec(1400, 2000),  (10, 10, 10), (40, 40, 40), dark=True, music=assets.MUSIC_CAVE)
-        worlds.append(cave_world)
+        island = World("Island", Vec(3000, 1500), (45, 149, 180), (195, 179, 94))
+        worlds.append(island)
 
+        caveworld = World("Caveworld", Vec(1400, 2000), (10, 10, 10), (40, 40, 40), dark=True, solid_border=True, music=assets.MUSIC_CAVE)
+        worlds.append(caveworld)
 
 
         current_world = overworld
@@ -475,11 +501,11 @@ if __name__ == "__main__":
                                hover_message="Enter Cave? (SPACE)")
         overworld.add(Vec(2000, 2000), cave_entrance)
 
-        for i in range(15):
+        for i in range(12):
             overworld.add(overworld.rand_pos(), new_rock())
 
         overworld.add_spawner(Spawner(8000, new_tree, max_num=12, center_spread=1.25, pre_spawned=12))
-        overworld.add_spawner(Spawner(4000, new_brawler, max_num=5))
+        overworld.add_spawner(Spawner(4000, new_brawler, max_num=6))
         #overworld.add_spawner(Spawner(10000, new_ranger, max_num=3))
         overworld.add_spawner(Spawner(45000, new_brawler_boss, max_num=1))
 
@@ -487,38 +513,38 @@ if __name__ == "__main__":
         for i in range(5):
             size = Vec(random.randint(700, 1250), random.randint(750, 1250))
             entrance = Portal("House", assets.IMG_HOUSE, 1, hitbox_size=Vec(180, 220), solid=True)
-            house_world = World("House world #" + str(i), size, (38, 26, 13), (51, 46, 40), dark=True)
+            house_world = World("House world #" + str(i), size, (30, 30, 20), (70, 65, 60), dark=True, solid_border=True)
             overworld.add_dungeon(overworld.rand_pos(), new_dungeon(entrance, house_world))
 
 
         for i in range(8):
-            city_world.add(overworld.rand_pos(), new_street_light())
+            city.add(overworld.rand_pos(), new_street_light())
         for i in range(5):
-            size = Vec(random.randint(750, 1250), random.randint(750, 1250))
-            entrance = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(145, 180), solid=True)
-            office_world = World("Office world #" + str(i), size, (91, 108, 120), (191, 180, 147))
-            city_world.add_dungeon(city_world.rand_pos(), new_dungeon(entrance, office_world))
+            size = Vec(random.randint(600, 800), random.randint(600, 800))
+            entrance = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(150, 185), solid=True)
+            office_world = World("Office world #" + str(i), size, (91, 108, 120), (191, 180, 147), solid_border=True)
+            city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world))
 
         #city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
-        city_world.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=8))
-        city_world.add_spawner(Spawner(0, new_car, max_num=3, pre_spawned=3))
+        city.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=8))
+        city.add_spawner(Spawner(0, new_car, max_num=3, pre_spawned=3))
 
 
         for i in range(8):
-            forest_world.add(forest_world.rand_pos(), new_rock())
-        forest_world.add_spawner(Spawner(6000, new_ranger, max_num=4, pre_spawned=2))
-        forest_world.add_spawner(Spawner(3000, new_ranger_boss, max_num=2, pre_spawned=0))
-        forest_world.add_spawner(Spawner(5000, new_winter_tree, max_num=20, pre_spawned=20))
+            forest.add(forest.rand_pos(), new_rock())
+        forest.add_spawner(Spawner(6000, new_ranger, max_num=4, pre_spawned=2))
+        forest.add_spawner(Spawner(3000, new_ranger_boss, max_num=2, pre_spawned=0))
+        forest.add_spawner(Spawner(5000, new_winter_tree, max_num=20, pre_spawned=20))
 
         cave_exit = Portal("Cave Exit", assets.IMG_CAVE_EXIT, 1.25, solid=False,
                            hover_message="Exit Cave? (SPACE)", to_entity=cave_entrance)
-        cave_world.add(Vec(700, -80), cave_exit)
+        caveworld.add(Vec(700, -80), cave_exit)
         # Reference cave entrances's destination to the cave exit because now the exit is defined
         #cave_entrance.to_world = cave_world
         cave_entrance.to_entity = cave_exit
 
 
-        cave_world.add_spawner(Spawner(3000, new_brawler_boss, max_num=4, pre_spawned=1))
+        caveworld.add_spawner(Spawner(3000, new_brawler_boss, max_num=4, pre_spawned=1))
 
 
         while not restart:

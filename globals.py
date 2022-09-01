@@ -2,7 +2,7 @@ from vector import Vec
 
 
 class Globals:
-    SIZE = Vec(1400, 1000)
+    SIZE = Vec(1400, 950)
     delta_time = 0
     cursor_img = None
 
@@ -10,5 +10,5 @@ class Globals:
     debug_mode = False
     show_overlay = True
 
-    sound_on = False
+    sound_on = True
 

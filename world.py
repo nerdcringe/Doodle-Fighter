@@ -8,7 +8,7 @@ from entity import *
 
 
 class World:
-    def __init__(self, name, size, outer_color, inner_color=None, dark=False, image=None, music=None):
+    def __init__(self, name, size, outer_color, inner_color=None, dark=False, solid_border=False, image=None, music=None):
         self.name = name
         self.size = size
         self.bg_surface = pygame.Surface(size.tuple(), pygame.SRCALPHA, 32)
@@ -17,6 +17,7 @@ class World:
         self.outer_color, = outer_color,
         self.inner_color, = inner_color,
         self.dark = dark
+        self.solid_border = solid_border
         self.image = image
 
         rect = util.rect_center(size/2, size)
