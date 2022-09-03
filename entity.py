@@ -20,7 +20,7 @@ def opposes(self, other):
 
 class Entity:
     def __init__(self, name, image, image_scale=1, team=NEUTRAL, health=None, solid=False, hitbox_size=None,
-                 death_func=None):
+                 death_func=None, animate=False):
         self.name = name
         self.default_image = image
         self.current_image = None
@@ -36,6 +36,7 @@ class Entity:
         self.max_health = self.health
         self.solid = solid
         self.death_func = death_func # Callback to run after death
+        self.animate = animate
 
         self.pos = Vec(0, 0)
         self.vel = Vec(0, 0)
@@ -91,6 +92,10 @@ class Entity:
                 render_rect.x += random.randint(-dist, dist)
                 render_rect.y += random.randint(-dist, dist)
             self.shake_timer -= Globals.delta_time
+
+        if self.animate:
+            if random.randint(0, 5) == 0:
+                self.surface = pygame.transform.flip(self.surface, -1, 0)
 
         surface.blit(self.surface, render_rect)
 
@@ -166,8 +171,8 @@ class Entity:
             else:
                 other.pos.y = max(other_bottom - 20, bottom) - other.size.y/2 + 20
 
-    def accel(self, v):
-        self.vel += v
+    def accel(self, a):
+        self.vel += a
 
     def hitbox(self):
         return util.rect_center(self.pos, self.size)
@@ -308,8 +313,10 @@ class AIEntity(Entity):
         self.accel(radius_dir.norm() * self.follow_weight * magnitude)
         self.atk_timer += Globals.delta_time
 
+
     def update(self, world, player):
         follow = list(filter(self.can_follow, world.entities))
+
         if len(follow) > 0:
             target = follow[0]
 
@@ -358,10 +365,11 @@ class RangedAIEntity(AIEntity):
         self.atk_timer += Globals.delta_time
 
 
+
 class Projectile(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, direction, Range, parent=None,
-                 blockable=True, rotate=True, death_func=None, collide_func=None):
-        super().__init__(name, image, image_scale, team, health, death_func=death_func)
+                 blockable=True, rotate=True, death_func=None, collide_func=None, hitbox_size=None):
+        super().__init__(name, image, image_scale, team, health, death_func=death_func, hitbox_size=hitbox_size)
         self.speed = speed
         self.damage = damage
         self.vel = direction.norm() * self.speed
@@ -395,9 +403,9 @@ class Projectile(Entity):
         # wall_dist > 0 when outer edge of sprite is outside world border
         hits_border = world.solid_border and \
                     (x <= w/2 or x >= world.size.x - w/2
-                     or y <= h/2 + 5 or y >= world.size.y - h/2)
+                     or y <= h/2 - 100 or y >= world.size.y - h/2)
 
-        if self.distance > self.range or hits_border and self.time > 0:
+        if (self.distance > self.range or hits_border) and self.time > 50:
             if self.death_func is not None:
                 self.death_func(self, world, self.team)
             self.alive = False

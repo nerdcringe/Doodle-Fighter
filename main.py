@@ -50,11 +50,13 @@ def new_street_light():
     return Entity("Street Light", assets.IMG_STREET_LIGHT, 0.675, solid=True, hitbox_size=Vec(25, 140),
                   death_func=None)
 
+def new_umbrella():
+    return Entity("Umbrella", assets.IMG_UMBRELLA, 0.675, solid=True, hitbox_size=Vec(10, 135))
+
 
 def new_dungeon(entrance, dungeon_world, enemy_sets):
-    door = Portal("Door", assets.IMG_DOOR, 0.8, to_entity=entrance) # Exiting the door sends player outside the dungeon
+    door = Portal("Door", assets.IMG_DOOR, 0.8, to_entity=entrance, hover_message="Exit? (SPACE)") # Exiting the door sends player outside the dungeon
     dungeon_world.add(Vec(dungeon_world.size.x/2, -60), door)
-
     entrance.to_entity = door  # Set dungeon destination to the door inside the dungeon
 
     chosen_set = random.choice(enemy_sets)
@@ -83,7 +85,7 @@ def new_ranger():
                           death_func=ranger_loot, hitbox_size=Vec(64, 64))
 
 def new_ranger_boss():
-    return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, speed=0.5, team=ENEMY, health=40, damage=1, sight_range=800,
+    return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, speed=0.5, team=ENEMY, health=35, damage=1, sight_range=800,
                           follow_weight=0.05, atk_interval=1000, retreat_range=350, weapon_func=arrow_shot,
                           death_func=ranger_boss_loot, hitbox_size=Vec(100, 100))
 
@@ -105,12 +107,12 @@ def new_car():
     return car
 
 def new_cooler():
-    return RangedAIEntity("Cooler", assets.IMG_COOLER, 0.4, speed=0.45, team=ENEMY, health=8, damage=1, sight_range=400,
-                          follow_weight=0.05, atk_interval=6000, retreat_range=300, weapon_func=freeze_ray_shot,
+    return RangedAIEntity("Cooler", assets.IMG_COOLER, 0.4, speed=0.45, team=ENEMY, health=8, damage=1, sight_range=600,
+                          follow_weight=0.05, atk_interval=6000, retreat_range=250, weapon_func=freeze_ray_shot,
                           death_func=cooler_loot, hitbox_size=Vec(80, 80))
 
 def new_freezer():
-    return RangedAIEntity("Freezer", assets.IMG_FREEZER, 0.7, speed=0.5, team=ENEMY, health=40, damage=1, sight_range=400,
+    return RangedAIEntity("Freezer", assets.IMG_FREEZER, 0.7, speed=0.5, team=ENEMY, health=40, damage=1, sight_range=600,
                           follow_weight=0.03, atk_interval=4500, retreat_range=400, weapon_func=freeze_ray_shot,
                           death_func=freezer_loot, hitbox_size=Vec(140, 170))
 
@@ -181,7 +183,8 @@ def shotgun_shot(world, parent, team, direction):
 
 def arrow_shot(world, parent, team, direction):
     assets.play_sound(assets.SFX_SHOOT_ARROW, parent.pos, player.pos)
-    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.8, team, None, 2, direction, 650, parent=parent, death_func=spawn_poof, blockable=False)
+    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.8, team, None, 2, direction, 650, parent=parent,
+                       death_func=spawn_poof, blockable=False, hitbox_size=Vec(30, 30))
     world.add(parent.pos, arrow)
 
 def grenade_shot(world, parent, team, direction):
@@ -206,7 +209,7 @@ def spawn_explosion(self, world, team):
     world.add(self.pos, explosion)
 
 def freeze(self, other):
-    if other.speed > 0: # Only freeze entities that can move
+    if other.speed > 0 and not other.invincible:  # Only freeze entities that can move and have health
         other.frozen_timer = 3000
 
 def spawn_frozen_cloud(self, world, team):
@@ -259,7 +262,7 @@ def zoomer_loot(self, world, team):
     if random.random() < 0.15:
         loot = random.choice((new_metalsuit_item, new_shield_item))
         drop_item(self.pos, loot(), world)
-    if random.random() < 0.2:
+    if random.random() < 0.3:
         drop_item(self.pos, new_troops_item(), world)
 
 def car_loot(self, world, team):
@@ -274,9 +277,8 @@ def brawler_boss_loot(self, world, team):
     drop_item(self.pos, loot(), world)
 
 def ranger_boss_loot(self, world, team):
-    drop_item(self.pos, new_arrows_item(), world)
-    drop_item(self.pos, new_invis_item(), world)
     drop_item(self.pos, new_apple_item(), world)
+    drop_item(self.pos, random.choice((new_shield_item, new_dmg_up_item, new_invis_item))(), world)
 
 def cooler_loot(self, world, team):
     if random.random() < 0.5:
@@ -310,12 +312,16 @@ class Player(Entity):
         self.speed = speed
         self.hurt_func = hurt_func
         self.is_player = True
+        self.invisible = False
         self.damage_multiplier = 1
 
     def update(self, world, player):
         super().update(world, player)
         if self.shake_timer <= 0 and powerups[metalsuit] <= 0 and powerups[invis] <= 0:
             self.set_image(assets.IMG_PLAYER_ALIVE)
+
+        self.invisible = powerups[invis] > 0
+
 
     def control(self, keys):
         horizontal = False
@@ -528,19 +534,22 @@ if __name__ == "__main__":
         overworld = World("Overworld", Vec(2500, 2500), (220, 200, 140), (85, 175, 95), music=assets.MUSIC_OVERWORLD)
         worlds.append(overworld)
 
-        city = World("Cityworld", Vec(2500, 2500), (100, 200, 150), (175, 175, 175))#image=assets.IMG_BG_CITY)
+        city = World("City", Vec(3000, 3000), (100, 200, 150), (175, 175, 175), music=assets.MUSIC_RAIN)
+        #image=assets.IMG_BG_CITY)
         worlds.append(city)
 
-        frostland = World("Frostland", Vec(2500, 3000), (200, 240, 250), (150, 220, 230))
+        frostland = World("Frostland", Vec(2750, 3250), (200, 240, 250), (150, 210, 225), music=assets.MUSIC_WINTER)
         worlds.append(frostland)
 
-        forest = World("Forestworld", Vec(2250, 2250), (13, 46, 37), (38, 75, 60), dark=True, music=assets.MUSIC_FOREST)
+        forest = World("Forest", Vec(2500, 2500), (13, 46, 37), (38, 75, 60), dark=True, music=assets.MUSIC_FOREST,
+                       complete_condition=lambda w: w.time_elapsed > 60000)
         worlds.append(forest)
 
-        island = World("Island", Vec(3000, 1500), (45, 149, 180), (195, 179, 94))
-        worlds.append(island)
+        beach = World("Beach", Vec(3000, 1500), (45, 149, 180), (195, 179, 94), music=assets.MUSIC_BEACH)
+        worlds.append(beach)
 
-        caveworld = World("Caveworld", Vec(1400, 2000), (10, 10, 10), (40, 40, 40), dark=True, solid_border=True, music=assets.MUSIC_CAVE)
+        caveworld = World("Caveworld", Vec(1400, 2000), (10, 10, 10), (40, 40, 40), dark=True, solid_border=True,
+                          music=assets.MUSIC_CAVE)
         worlds.append(caveworld)
 
 
@@ -553,54 +562,27 @@ if __name__ == "__main__":
         overworld.add(overworld.size/2, player)
 
 
-        cave_entrance = Portal("Cave", assets.IMG_CAVE, 1, solid=True, hitbox_size=Vec(260, 140),
-                               hover_message="Enter Cave? (SPACE)")
+        cave_entrance = Portal("Cave", assets.IMG_CAVE, 0.95, solid=True, hitbox_size=Vec(280, 145),
+                               hover_message="Enter? (SPACE)")
         overworld.add(Vec(2000, 2000), cave_entrance)
 
-        for i in range(12):
+        for i in range(8):
             overworld.add(overworld.rand_pos(), new_rock())
 
-        overworld.add_spawner(Spawner(8000, new_tree, max_num=12, center_spread=1.25, pre_spawned=12))
-        overworld.add_spawner(Spawner(5000, new_brawler, max_num=9, max_spawn=3))
+        overworld.add_spawner(Spawner(8000, new_tree, max_num=10, center_spread=1.25, pre_spawned=10))
+        overworld.add_spawner(Spawner(6000, new_brawler, max_num=8, max_spawn=3))
         #overworld.add_spawner(Spawner(10000, new_ranger, max_num=3))
         overworld.add_spawner(Spawner(45000, new_brawler_boss, max_num=1))
 
         for i in range(5):
             size = Vec(random.randint(700, 1250), random.randint(750, 1250))
-            entrance = Portal("House", assets.IMG_HOUSE, 0.9, hitbox_size=Vec(160, 220), solid=True)
+            entrance = Portal("House", assets.IMG_HOUSE, 0.9, hitbox_size=Vec(160, 220), solid=True, hover_message="Enter? (SPACE)")
             house_world = World("House world #" + str(i), size, (100, 55, 36), (185, 153, 110), solid_border=True)
-            enemy_sets = ((4, new_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss), (1, new_ranger_boss))
+            enemy_sets = ((4, new_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss))
             overworld.add_dungeon(overworld.rand_pos(), new_dungeon(entrance, house_world, enemy_sets))
 
-
-        for i in range(8):
-            city.add(overworld.rand_pos(), new_street_light())
-        for i in range(5):
-            entrance = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(150, 185), solid=True)
-            size = Vec(random.randint(600, 800), random.randint(600, 800))
-            office_world = World("Office world #" + str(i), size, (91, 108, 120), (191, 180, 147), solid_border=True)
-            enemy_sets = ((4, new_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss), (1, new_ranger_boss), (2, new_zoomer))
-            city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world, enemy_sets))
-
-        #city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
-        city.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=8))
-        city.add_spawner(Spawner(0, new_car, max_num=3, pre_spawned=3))
-
-
-        frostland.add_spawner(Spawner(6000, new_winter_tree, max_num=6, center_spread=2, pre_spawned=10))
-        frostland.add_spawner(Spawner(5000, new_cold_brawler, max_num=6, max_spawn=2))
-        frostland.add_spawner(Spawner(7500, new_cooler, max_num=3, max_spawn=1))
-        frostland.add_spawner(Spawner(20000, new_freezer, max_num=2, max_spawn=1))
-
-
-        for i in range(8):
-            forest.add(forest.rand_pos(), new_rock())
-        forest.add_spawner(Spawner(6000, new_ranger, max_num=4, pre_spawned=2))
-        forest.add_spawner(Spawner(3000, new_ranger_boss, max_num=2, pre_spawned=0))
-        forest.add_spawner(Spawner(5000, new_winter_tree, max_num=20, pre_spawned=20))
-
         cave_exit = Portal("Cave Exit", assets.IMG_CAVE_EXIT, 1.25, solid=False,
-                           hover_message="Exit Cave? (SPACE)", to_entity=cave_entrance)
+                           hover_message="Exit? (SPACE)", to_entity=cave_entrance)
         caveworld.add(Vec(700, -80), cave_exit)
         # Reference cave entrances's destination to the cave exit because now the exit is defined
         #cave_entrance.to_world = cave_world
@@ -609,22 +591,64 @@ if __name__ == "__main__":
         caveworld.add_spawner(Spawner(3000, new_brawler_boss, max_num=4, pre_spawned=1))
 
 
+        for i in range(8):
+            city.add(overworld.rand_pos(), new_street_light())
         for i in range(5):
-            entrance = Portal("Igloo", assets.IMG_IGLOO, 0.85, hitbox_size=Vec(185, 185), solid=True)
+            entrance = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(150, 185), solid=True, hover_message="Enter? (SPACE)")
+            size = Vec(random.randint(600, 800), random.randint(600, 800))
+            office_world = World("Office world #" + str(i), size, (91, 108, 120), (191, 180, 147), solid_border=True)
+            enemy_sets = ((4, new_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss), (2, new_zoomer))
+            city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world, enemy_sets))
+
+        #city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
+        city.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=8))
+        city.add_spawner(Spawner(0, new_car, max_num=5, pre_spawned=2))
+        city.add_spawner(Spawner(6000, new_brawler, max_num=6, max_spawn=2, pre_spawned=0))
+        city.add_spawner(Spawner(18000, new_boomer, max_num=4, max_spawn=2, pre_spawned=0))
+        city.add_spawner(Spawner(45000, new_brawler_boss, max_num=2, pre_spawned=0))
+        #city.add_spawner(Spawner(18000, new_zoomer, max_num=4, max_spawn=2, pre_spawned=0))
+
+
+        frostland.add_spawner(Spawner(6000, new_winter_tree, max_num=6, center_spread=2, pre_spawned=10))
+        frostland.add_spawner(Spawner(5000, new_cold_brawler, max_num=4, max_spawn=2))
+        frostland.add_spawner(Spawner(7500, new_cooler, max_num=4, max_spawn=1))
+        frostland.add_spawner(Spawner(20000, new_freezer, max_num=2, max_spawn=1))
+
+
+        for i in range(5):
+            entrance = Portal("Igloo", assets.IMG_IGLOO, 0.85, hitbox_size=Vec(185, 185), solid=True, hover_message="Enter? (SPACE)")
             size = Vec(random.randint(500, 700), random.randint(500, 700))
-            igloo_world = World("Igloo #" + str(i), size, (200, 240, 250), (150, 220, 230), solid_border=True)
-            enemy_sets = ((4, new_cold_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss), (1, new_ranger_boss),
+            igloo_world = World("Igloo #" + str(i), size, (200, 240, 250), (150, 210, 225), solid_border=True, music=assets.MUSIC_FIREPLACE)
+            igloo_world.add(Vec(size.x/2, size.y+100), Entity("Fireplace", assets.IMG_FIREPLACE, 0.9, animate=True))
+
+            enemy_sets = ((4, new_cold_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss),
                           (2, new_zoomer), (3, new_cooler), (1, new_freezer))
             frostland.add_dungeon(frostland.rand_pos(), new_dungeon(entrance, igloo_world, enemy_sets))
+
+
+        for i in range(8):
+            forest.add(forest.rand_pos(), new_rock())
+        forest.add_spawner(Spawner(7000, new_ranger, max_num=8, max_spawn=2, pre_spawned=2))
+        forest.add_spawner(Spawner(10000, new_ranger_boss, max_num=2, pre_spawned=0))
+        forest.add_spawner(Spawner(5000, new_winter_tree, max_num=16, pre_spawned=18))
+
+
+        beach.add_spawner(Spawner(8000, new_zoomer, max_num=4, max_spawn=2, center_spread=100))
+        beach.add_spawner(Spawner(10000, new_cooler, max_num=2, max_spawn=1))
+        for i in range(5):
+            beach.add(beach.rand_pos(), new_umbrella())
+        for i in range(5):
+            beach.add(beach.rand_pos(), new_rock())
 
 
         while not restart:
             frames += 1
             Globals.delta_time = clock.tick(Globals.FPS)
+            current_world.time_elapsed += Globals.delta_time
 
             keys_pressed = pygame.key.get_pressed()
             interact = False
-            mouse_down = False
+            MOUSE_BUTTONS = pygame.mouse.get_pressed(3)
             MOUSE_POS = Vec(pygame.mouse.get_pos())
             MOUSE_WORLD_POS = world_pos(MOUSE_POS)
 
@@ -641,13 +665,15 @@ if __name__ == "__main__":
                             placeable_troops -= 1
 
                     elif event.button == 1:
-                        mouse_down = True
                         if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
                             Globals.sound_on = not Globals.sound_on
+                            if Globals.sound_on:
+                                current_world.start_music()
+                            else:
+                                pygame.mixer.music.pause()
 
                         elif player.health > 0:
                             powerups[invis] = 0
-
 
                 elif event.type == pygame.KEYDOWN:
                     debug(event.key, MOUSE_WORLD_POS)
@@ -666,7 +692,7 @@ if __name__ == "__main__":
                     Globals.SIZE = Vec(event.size)
                     overlay = pygame.Surface(event.size).convert_alpha()
 
-            if player.health > 0 and pygame.mouse.get_pressed(3)[0]:
+            if player.health > 0 and MOUSE_BUTTONS[0]:  # Get if right click is held
                 standard_gun = True
 
                 if powerups[shotgun] > 0:
@@ -701,13 +727,27 @@ if __name__ == "__main__":
                     single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
                     last_shoot_time = pygame.time.get_ticks()
 
+            if current_world.complete_condition is not None and not current_world.completed:
+                if current_world.complete_condition(current_world):
+                    current_world.completed = True
+                    next_sign = Portal("Next Sign", assets.IMG_NEXT_SIGN, 0.5, hover_message="Next world? (SPACE)",
+                                hitbox_size=Vec(125, 125), solid=True)
+                    current_world.add(current_world.rand_pos(), next_sign)
+                    next_sign.to_world = worlds[worlds.index(current_world) + 1]
+
+                    if current_world != worlds[0]:
+                        last_sign = Portal("Last Sign", assets.IMG_LAST_SIGN, 0.5, hover_message="Last world? (SPACE)",
+                                    hitbox_size=Vec(125, 125), solid=True)
+                        current_world.add(current_world.rand_pos(), last_sign)
+                        last_sign.to_world = worlds[worlds.index(current_world) - 1]
 
             # Destroy dungeons whose enemies have been defeated
             for dungeon in current_world.dungeons:
-                if len(dungeon.destination_world().enemies) == 0:
-                    dungeon.world.remove(dungeon)
-                    current_world.dungeons.remove(dungeon)
-                    spawn_explosion(dungeon, dungeon.world, team=player)
+                if dungeon in current_world.entities:
+                    if len(dungeon.destination_world().enemies) == 0:
+                        dungeon.world.remove(dungeon)
+                        spawn_explosion(dungeon, dungeon.world, team=player)
+                        current_world.dungeons_defeated += 1
 
 
             # Automatically deplete powerups as time goes on
@@ -731,7 +771,6 @@ if __name__ == "__main__":
                 else:
                     player.speed = player_speed
 
-
             if powerups[invis] > 0:
                 player.set_image(assets.IMG_PLAYER_INVIS)
             elif powerups[metalsuit] > 0:
@@ -745,7 +784,6 @@ if __name__ == "__main__":
             if powerups[metalsuit] <= 0 and powerups[invis] <= 0:
                 if player.current_image is not assets.IMG_PLAYER_OW and player.current_image is not assets.IMG_PLAYER_DEAD:
                     player.set_image(assets.IMG_PLAYER_ALIVE)
-
 
             player.control(keys_pressed)
 
@@ -781,6 +819,7 @@ if __name__ == "__main__":
             for e in current_world.entities:
                 e.render(window, overlay, screen_pos(Vec(e.hitbox().center)))
 
+
             # Render overlay layer
             if Globals.show_overlay:
                 stats = [
@@ -795,6 +834,7 @@ if __name__ == "__main__":
                 if Globals.debug_mode:
                     stats.append("# Entities: " + str(len(current_world.entities)))
                     stats.append("FPS: " + str(round(clock.get_fps(), 1)))
+                    stats.append("Time: " + str(current_world.time_elapsed/1000))
 
                 util.draw_bar(overlay, Vec(115, Globals.SIZE.y - 35 * 6 - 6), Vec(200, 33),
                               player.health / player.max_health, (80, 130, 255), (0, 0, 0), center=False)

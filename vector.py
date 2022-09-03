@@ -69,6 +69,9 @@ class Vec:
     def dist(self, v):
         return math.hypot(self.x - v.x, self.x - v.x)
 
+    def dot(self, v):
+        return self.x * v.x + self.y * v.y
+
     def tuple(self):
         return (self.x, self.y)
     

@@ -8,7 +8,7 @@ from entity import *
 
 
 class World:
-    def __init__(self, name, size, outer_color, inner_color=None, dark=False, solid_border=False, image=None, music=None):
+    def __init__(self, name, size, outer_color, inner_color=None, dark=False, solid_border=False, image=None, music=None, complete_condition=None):
         self.name = name
         self.size = size
         self.bg_surface = pygame.Surface(size.tuple(), pygame.SRCALPHA, 32)
@@ -19,6 +19,15 @@ class World:
         self.dark = dark
         self.solid_border = solid_border
         self.image = image
+        self.music = music
+
+        # When this boolean getter function is true, spawn the next world sign
+        # By default it is when all dungeons are defeated
+        if complete_condition is None:
+            self.complete_condition = lambda w: w.dungeons_defeated == len(w.dungeons) and len(w.dungeons) != 0
+        else:
+            self.complete_condition = complete_condition
+        self.completed = False
 
         rect = util.rect_center(size/2, size)
         if inner_color is not None:
@@ -29,11 +38,12 @@ class World:
         self.entities = []
         self.spawners = []
         self.dungeons = []
+        self.dungeons_defeated = 0
+        self.time_elapsed = 0
 
         self.enemies = set([])
         self.allies = set([])
 
-        self.music = music
 
     def start_music(self):
         if self.music is not None:
@@ -57,7 +67,7 @@ class World:
                 self.enemies.add(e)
             elif e.team == ALLY and not e.is_player:
                 self.allies.add(e)
-                print(e)
+                #print(e)
 
     def remove(self, e):
         if e in self.entities:

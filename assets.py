@@ -38,8 +38,12 @@ def font_path(name):
 MAIN_FONT = font_path("StayPuft.ttf")
 
 MUSIC_OVERWORLD = load_music("overworld.wav")
-MUSIC_FOREST = load_music("forest.wav")
 MUSIC_CAVE = load_music("cave.wav")
+MUSIC_RAIN = load_music("rain.wav")
+MUSIC_WINTER = load_music("winter.wav")
+MUSIC_FIREPLACE = load_music("fireplace.wav")
+MUSIC_FOREST = load_music("forest.wav")
+MUSIC_BEACH = load_music("beach.wav")
 
 sfx = []
 SFX_HIT_1 = load_sfx("hit_1.wav", 0.2)
@@ -137,6 +141,7 @@ IMG_TREE_CITY = load_image("tree_city.png")
 IMG_TREE_WINTER = load_image("tree_winter.png")
 IMG_ROCK = load_image("rock.png")
 IMG_STREET_LIGHT = load_image("street_light.png")
+IMG_UMBRELLA = load_image("umbrella.png")
 
 IMG_GRAVE = load_image("grave.png")
 IMG_OFFICE = load_image("office.png")
@@ -145,7 +150,9 @@ IMG_IGLOO = load_image("igloo.png")
 IMG_CAVE = load_image("cave.png")
 IMG_CAVE_EXIT = load_image("cave_exit.png")
 IMG_DOOR = load_image("door.png")
+IMG_FIREPLACE = load_image("fireplace.png")
 IMG_NEXT_SIGN = load_image("next.png")
+IMG_LAST_SIGN = load_image("last.png")
 
 IMG_DMG_UP = load_image("item_dmg_up.png")
 IMG_APPLE = load_image("item_apple.png")
