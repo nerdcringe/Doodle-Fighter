@@ -42,7 +42,7 @@ class Entity:
         self.vel = Vec(0, 0)
         self.speed = 0
         self.shake_timer = 0  # Timer to track how long to shake sprite
-        self.take_knockback = False # Whether to get pushed back when hurt
+        self.take_knockback = True # Whether to get pushed back when hurt
         self.last_collisions = set([])
 
         self.world = None
@@ -67,11 +67,18 @@ class Entity:
         self.set_image(image)
 
     def set_image(self, image):
-        if self.current_image is not image:
+        size = Vec(image.get_size()) * self.image_scale
+        if self.current_image is not image or size is not Vec(self.image_size):
             self.current_image = image
-            self.image_size = Vec(image.get_size()) * self.image_scale
+            self.image_size = size
             self.surface.fill((0, 0, 0, 0))
             self.surface.blit(util.scale_image(image, self.image_scale), (0, 0))
+
+    def resize(self, scale_multiplier):
+        self.image_scale *= scale_multiplier
+        self.size *= scale_multiplier
+        self.surface = pygame.Surface(self.size.tuple(), pygame.SRCALPHA, 32).convert_alpha()
+        self.set_image(self.current_image)
 
     def rotate(self, angle):
         self.surface = pygame.transform.rotate(self.surface, angle)
@@ -236,7 +243,6 @@ class Portal(Entity):
 
 
 
-
 class AIEntity(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
                  death_func=None, hitbox_size=None):
@@ -248,7 +254,6 @@ class AIEntity(Entity):
         self.atk_interval = atk_interval  # time between initiating attacks on a target (milliseconds)
         self.atk_timer = 0
         self.retreat_range = retreat_range  # how far to back up when recharging attack
-
         # different sprites for different direction is optional
 
         self.right_image = None
@@ -268,6 +273,10 @@ class AIEntity(Entity):
                 self.set_image(self.default_image)
 
         super().render(surface, overlay_surface, pos)
+
+        """render_rect = self.hitbox().copy()
+        render_rect.center = pos.tuple()
+        util.write(surface, self.name, assets.MAIN_FONT, 22, Vec(render_rect.centerx, render_rect.top - 35), (255, 255, 255), center=True)"""
 
     def in_range(self, other):
         return Vec.dist(self.pos, other.pos) <= self.sight_range
@@ -311,7 +320,6 @@ class AIEntity(Entity):
         radius_dir = radius_pos - self.pos
         magnitude = self.vel.mag() / self.speed + 0.5
         self.accel(radius_dir.norm() * self.follow_weight * magnitude)
-        self.atk_timer += Globals.delta_time
 
 
     def update(self, world, player):
@@ -325,6 +333,7 @@ class AIEntity(Entity):
 
             if self.atk_timer > self.atk_interval + random.randint(-100, 100):
                 self.attack(target_dir, world)
+                self.atk_timer += Globals.delta_time
 
                 if self.colliding(target):
                     target.hurt(self.damage, world)
@@ -335,6 +344,7 @@ class AIEntity(Entity):
                     self.atk_timer = 0
             else:
                 self.retreat(target, target_dir)
+                self.atk_timer += Globals.delta_time
 
         else:
             self.atk_timer = self.atk_interval
@@ -362,7 +372,6 @@ class RangedAIEntity(AIEntity):
         radius_dir = radius_pos - self.pos
         magnitude = self.vel.mag() / self.speed + 0.5
         self.accel(radius_dir.norm() * self.follow_weight * magnitude)
-        self.atk_timer += Globals.delta_time
 
 
 
@@ -416,6 +425,7 @@ class Projectile(Entity):
     def collide(self, other, world):
         super().collide(other, world)
         opposed = opposes(self, other)
+
         if other not in self.last_collisions:
             # Free allies from ice when shooting them
             if not opposed and other.frozen_timer > 0 and other is not self.parent:
@@ -434,7 +444,7 @@ class Projectile(Entity):
                     other.hurt(damage, world)
 
                 if other.take_knockback:
-                    other.accel((other.pos - self.pos) * 10)
+                    other.accel((other.pos - self.pos) * 0.05)
                 if self.blockable:
                     if self.death_func is not None:
                         self.death_func(self, world, self.team)

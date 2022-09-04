@@ -36,18 +36,22 @@ def new_tree():
     return Entity("Tree", assets.IMG_TREE, 0.675, health=25, solid=True, hitbox_size=Vec(50, 165), death_func=tree_loot)
 
 def new_city_tree():
-    return Entity("City Tree", assets.IMG_TREE_CITY, 0.675, health=25, solid=True, hitbox_size=Vec(55, 170),
+    return Entity("City Tree", assets.IMG_TREE_CITY, 0.675, health=30, solid=True, hitbox_size=Vec(55, 170),
                   death_func=tree_loot)
 
 def new_winter_tree():
-    return Entity("Winter Tree", assets.IMG_TREE_WINTER, 0.675, health=25, solid=True, hitbox_size=Vec(30, 320),
+    return Entity("Winter Tree", assets.IMG_TREE_WINTER, 0.675, health=35, solid=True, hitbox_size=Vec(30, 320),
+                  death_func=tree_loot)
+
+def new_palm_tree():
+    return Entity("Palm Tree", assets.IMG_TREE_PALM, 0.675, health=40, solid=True, hitbox_size=Vec(30, 150),
                   death_func=tree_loot)
 
 def new_rock():
     return Entity("Rock", assets.IMG_ROCK, 1, solid=True, hitbox_size=Vec(85, 50))
 
 def new_street_light():
-    return Entity("Street Light", assets.IMG_STREET_LIGHT, 0.675, solid=True, hitbox_size=Vec(25, 140),
+    return Entity("Street Light", assets.IMG_STREET_LIGHT, 0.675, solid=True, hitbox_size=Vec(12, 130),
                   death_func=None)
 
 def new_umbrella():
@@ -62,19 +66,22 @@ def new_dungeon(entrance, dungeon_world, enemy_sets):
     chosen_set = random.choice(enemy_sets)
 
     for i in range(chosen_set[0]): # 0 index is amount to spawn
-        dungeon_world.add(Vec(dungeon_world.size.x/2, dungeon_world.size.y), chosen_set[1]())  # 1 index is the type of enemy
+        spawn_pos = Vec(dungeon_world.size.x * 0.5, dungeon_world.size.y * 0.75)
+        spawn_pos += Vec.polar(random.randint(50, 250), random.randint(0, 360))
+        dungeon_world.add(spawn_pos, chosen_set[1]())  # 1 index is the type of enemy
 
     return entrance
 
 
 def new_brawler():
-    return AIEntity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, death_func=brawler_loot)
+    return AIEntity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, sight_range=600, follow_weight=0.1,
+                    atk_interval=750, retreat_range=175, death_func=brawler_loot)
 
 def new_cold_brawler():
     return AIEntity("Brawler", assets.IMG_BRAWLER_COLD, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, death_func=brawler_loot)
 
 def new_brawler_boss():
-    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.6, ENEMY, 50, 3, 2000, 0.035, 1000, 225,
+    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.65, ENEMY, 50, 3, 1500, 0.035, 1000, 225,
                     hitbox_size=Vec(128, 128), death_func=brawler_boss_loot)
     boss.take_knockback = False
     return boss
@@ -94,13 +101,13 @@ def new_boomer():
                           weapon_func=grenade_shot, death_func=boomer_loot, hitbox_size=Vec(70, 70))
 
 def new_zoomer():
-    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.55, team=ENEMY, health=6, damage=2, sight_range=300,
+    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.55, team=ENEMY, health=12, damage=2, sight_range=300,
                           follow_weight=0.05, atk_interval=300, retreat_range=200,
                           weapon_func=single_shot, death_func=zoomer_loot, hitbox_size=Vec(70, 70))
 
 def new_car():
     car = AIEntity("Car", assets.IMG_CAR_FRONT, 0.5, 0.5, ENEMY, health=14, damage=2, sight_range=300, follow_weight=0.1,
-                    atk_interval=5000, retreat_range=400, death_func=car_loot)
+                    atk_interval=5000, retreat_range=400, death_func=car_loot, hitbox_size=Vec(110, 80))
 
     car.right_image = assets.IMG_CAR_SIDE
     car.left_image = pygame.transform.flip(car.right_image, True, False)
@@ -108,17 +115,30 @@ def new_car():
 
 def new_cooler():
     return RangedAIEntity("Cooler", assets.IMG_COOLER, 0.4, speed=0.45, team=ENEMY, health=8, damage=1, sight_range=600,
-                          follow_weight=0.05, atk_interval=6000, retreat_range=250, weapon_func=freeze_ray_shot,
+                          follow_weight=0.05, atk_interval=5000, retreat_range=250, weapon_func=freeze_ray_shot,
                           death_func=cooler_loot, hitbox_size=Vec(80, 80))
 
 def new_freezer():
-    return RangedAIEntity("Freezer", assets.IMG_FREEZER, 0.7, speed=0.5, team=ENEMY, health=40, damage=1, sight_range=600,
-                          follow_weight=0.03, atk_interval=4500, retreat_range=400, weapon_func=freeze_ray_shot,
+    return RangedAIEntity("Freezer", assets.IMG_FREEZER, 0.7, speed=0.5, team=ENEMY, health=50, damage=1, sight_range=600,
+                          follow_weight=0.03, atk_interval=4000, retreat_range=400, weapon_func=freeze_ray_shot,
                           death_func=freezer_loot, hitbox_size=Vec(140, 170))
+
+def new_yeti():
+    boss = AIEntity("Yeti", assets.IMG_YETI, 0.5, speed=0.65, team=ENEMY, health=60, damage=3, sight_range=1500,
+                    follow_weight=0.035, atk_interval=300, retreat_range=225, hitbox_size=Vec(128, 128),
+                    death_func=yeti_loot)
+    boss.take_knockback = False
+    return boss
+
+
+def new_zoomer_boss():
+    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.5, speed=0.75, team=ENEMY, health=65, damage=2, sight_range=600,
+                          follow_weight=0.05, atk_interval=150, retreat_range=200,
+                          weapon_func=single_shot, death_func=zoomer_boss_loot, hitbox_size=Vec(128, 200))
 
 
 def new_ally_troop():
-    return RangedAIEntity("Troop", assets.IMG_TROOP, 0.275, 0.4, ALLY, 8, 1, sight_range=600, follow_weight=0.05,
+    return RangedAIEntity("Troop", assets.IMG_TROOP, 0.275, 0.4, ALLY, health=8, damage=player.damage_multiplier, sight_range=600, follow_weight=0.05,
                           atk_interval=1500, retreat_range=350, weapon_func=single_shot, hitbox_size=Vec(64, 64))
 
 
@@ -163,7 +183,10 @@ def increase_troops(num=1):
 
 
 def new_bullet(parent, team, direction, Range):
-    return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, 1, 1.25, team, None, 2, direction, Range, parent=parent,
+    image_scale = 1
+    if parent is player:
+        image_scale = 1 + (0.1 * player.damage_multiplier)
+    return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, image_scale, 1.25, team, None, 2, direction, Range, parent=parent,
                       death_func=spawn_poof, blockable=True)
 
 def single_shot(world, parent, team, direction):
@@ -183,8 +206,8 @@ def shotgun_shot(world, parent, team, direction):
 
 def arrow_shot(world, parent, team, direction):
     assets.play_sound(assets.SFX_SHOOT_ARROW, parent.pos, player.pos)
-    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.8, team, None, 2, direction, 650, parent=parent,
-                       death_func=spawn_poof, blockable=False, hitbox_size=Vec(30, 30))
+    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.8, team, None, 1.5, direction, 750, parent=parent,
+                       death_func=spawn_poof, blockable=False, hitbox_size=Vec(36, 36))
     world.add(parent.pos, arrow)
 
 def grenade_shot(world, parent, team, direction):
@@ -195,7 +218,7 @@ def grenade_shot(world, parent, team, direction):
 
 def freeze_ray_shot(world, parent, team, direction):
     assets.play_sound(assets.SFX_SHOOT_GRENADE, parent.pos, player.pos)
-    s = Projectile("Freeze Ray Shot", assets.IMG_PROJECTILE_SNOWFLAKE, 0.4, 1.5, team, None, 2, direction, 400, parent=parent,
+    s = Projectile("Freeze Ray Shot", assets.IMG_PROJECTILE_SNOWFLAKE, 0.4, 1, team, None, 2, direction, 400, parent=parent,
                    death_func=spawn_frozen_cloud, blockable=True)
     world.add(parent.pos, s)
 
@@ -232,8 +255,8 @@ def drop_item(pos, item, world):
     item.keep_in_bounds(world)
 
 def tree_loot(self, world, team):
-    if random.randint(0, 1):
-        drop_item(self.pos, new_apple_item(), world)
+    #if random.randint(0, 1):
+    drop_item(self.pos, new_apple_item(), world)
 
 def brawler_loot(self, world, team):
     if random.random() < 0.25:
@@ -262,6 +285,7 @@ def zoomer_loot(self, world, team):
     if random.random() < 0.15:
         loot = random.choice((new_metalsuit_item, new_shield_item))
         drop_item(self.pos, loot(), world)
+    drop_item(self.pos, new_speed_item(), world)
     if random.random() < 0.3:
         drop_item(self.pos, new_troops_item(), world)
 
@@ -289,6 +313,21 @@ def cooler_loot(self, world, team):
 def freezer_loot(self, world, team):
     drop_item(self.pos, new_freeze_ray_item(), world)
     drop_item(self.pos, new_metalsuit_item(), world)
+
+def yeti_loot(self, world, team):
+    loot = random.choice((new_shield_item, new_dmg_up_item))
+    drop_item(self.pos, loot(), world)
+    drop_item(self.pos, new_freeze_ray_item(), world)
+
+def zoomer_boss_loot(self, world, team):
+    spawn_explosion(self, world, team)
+    drop_item(self.pos, random.choice((new_shield_item, new_dmg_up_item))(), world)
+    drop_item(self.pos, random.choice((new_shield_item, new_dmg_up_item))(), world)
+    drop_item(self.pos, new_metalsuit_item(), world)
+
+    for i in range(3):
+        world.add(self.pos, new_zoomer())
+
 
 Globals.cursor_img = assets.IMG_CURSOR_TARGET
 
@@ -321,7 +360,8 @@ class Player(Entity):
             self.set_image(assets.IMG_PLAYER_ALIVE)
 
         self.invisible = powerups[invis] > 0
-
+        self.health += 0.000125 * Globals.delta_time
+        self.health = min(self.health, self.max_health)
 
     def control(self, keys):
         horizontal = False
@@ -370,7 +410,6 @@ class Player(Entity):
 
     def heal(self, amount):
         self.health += amount
-        self.health = min(self.health, self.max_health)
         assets.play_sound(assets.SFX_EAT)
 
     def can_heal(self):
@@ -378,11 +417,12 @@ class Player(Entity):
 
     def raise_max_health(self, amount):
         self.max_health += amount
+        self.health += amount
         assets.play_sound(assets.SFX_BUFF)
+        self.resize(1.0175)
 
     def raise_damage_multiplier(self, amount):
         self.damage_multiplier += amount
-        #print(self.damage_multiplier)
         assets.play_sound(assets.SFX_BUFF)
 
 
@@ -441,11 +481,15 @@ def debug(key, mouse_world_pos):
     elif key == pygame.K_t:
         current_world.add(mouse_world_pos, new_ranger_boss())
     elif key == pygame.K_y:
-        current_world.add(mouse_world_pos, new_zoomer())
+        current_world.add(mouse_world_pos, new_yeti())
     elif key == pygame.K_u:
         current_world.add(mouse_world_pos, new_cooler())
     elif key == pygame.K_i:
         current_world.add(mouse_world_pos, new_freezer())
+    elif key == pygame.K_o:
+        current_world.add(mouse_world_pos, new_zoomer())
+    elif key == pygame.K_p:
+        current_world.add(mouse_world_pos, new_zoomer_boss())
 
     elif key == pygame.K_1:
         current_world.add(mouse_world_pos, new_apple_item())
@@ -473,8 +517,8 @@ def debug(key, mouse_world_pos):
 
     elif key == pygame.K_v:
         Globals.debug_mode = not Globals.debug_mode
-    elif key == pygame.K_c:
-        Globals.show_overlay = not Globals.show_overlay
+    #elif key == pygame.K_c:
+    #    Globals.show_overlay = not Globals.show_overlay
 
     elif key == pygame.K_b:
         if current_world in worlds:
@@ -494,6 +538,7 @@ def debug(key, mouse_world_pos):
 
 
 running = True
+paused = False
 
 if __name__ == "__main__":
     while running:
@@ -501,10 +546,10 @@ if __name__ == "__main__":
         frames = 0
 
 
-        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 12000)
-        arrows = Powerup("Arrows", assets.IMG_ARROWS, 15000)
-        grenade = Powerup("Grenade", assets.IMG_GRENADE, 15000)
-        freeze_ray = Powerup("Freeze Ray", assets.IMG_FREEZE_RAY, 10000)
+        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 12500)
+        arrows = Powerup("Arrows", assets.IMG_ARROWS, 16000)
+        grenade = Powerup("Grenade", assets.IMG_GRENADE, 16000)
+        freeze_ray = Powerup("Freeze Ray", assets.IMG_FREEZE_RAY, 12500)
         speed_shoes = Powerup("Speed", assets.IMG_SPEED_SHOES, 10000)
         invis = Powerup("Invis", assets.IMG_PLAYER_INVIS, 8000)
         metalsuit = Powerup("Metalsuit", assets.IMG_METALSUIT, 10000)
@@ -526,7 +571,7 @@ if __name__ == "__main__":
         last_grenade_time = 0
         last_freeze_ray_time = 0
 
-        placeable_troops = 3
+        placeable_troops = 0
 
 
         worlds = []
@@ -538,7 +583,7 @@ if __name__ == "__main__":
         #image=assets.IMG_BG_CITY)
         worlds.append(city)
 
-        frostland = World("Frostland", Vec(2750, 3250), (200, 240, 250), (150, 210, 225), music=assets.MUSIC_WINTER)
+        frostland = World("Frostland", Vec(3000, 3500), (200, 240, 250), (150, 210, 225), music=assets.MUSIC_WINTER)
         worlds.append(frostland)
 
         forest = World("Forest", Vec(2500, 2500), (13, 46, 37), (38, 75, 60), dark=True, music=assets.MUSIC_FOREST,
@@ -548,16 +593,18 @@ if __name__ == "__main__":
         beach = World("Beach", Vec(3000, 1500), (45, 149, 180), (195, 179, 94), music=assets.MUSIC_BEACH)
         worlds.append(beach)
 
-        caveworld = World("Caveworld", Vec(1400, 2000), (10, 10, 10), (40, 40, 40), dark=True, solid_border=True,
+        caveworld = World("Cave", Vec(1500, 1600), (10, 10, 10), (40, 40, 40), dark=True, solid_border=True,
                           music=assets.MUSIC_CAVE)
         worlds.append(caveworld)
 
+        space_station = World("Space Station", Vec(3000, 2000), (0, 0, 0), (180, 180, 180), solid_border=True)
+        worlds.append(space_station)
 
         current_world = overworld
         current_world.start_music()
 
 
-        player_speed = 0.65
+        player_speed = 0.7
         player = Player("Player", assets.IMG_PLAYER_ALIVE, 0.28, player_speed, ALLY, 20, death_func=spawn_grave)
         overworld.add(overworld.size/2, player)
 
@@ -570,58 +617,59 @@ if __name__ == "__main__":
             overworld.add(overworld.rand_pos(), new_rock())
 
         overworld.add_spawner(Spawner(8000, new_tree, max_num=10, center_spread=1.25, pre_spawned=10))
-        overworld.add_spawner(Spawner(6000, new_brawler, max_num=8, max_spawn=3))
+        overworld.add_spawner(Spawner(8000, new_brawler, max_num=6, max_spawn=3))
+        overworld.add_spawner(Spawner(10000, new_ranger, max_num=3, max_spawn=1))
         #overworld.add_spawner(Spawner(10000, new_ranger, max_num=3))
         overworld.add_spawner(Spawner(45000, new_brawler_boss, max_num=1))
 
         for i in range(5):
-            size = Vec(random.randint(700, 1250), random.randint(750, 1250))
+            size = Vec(random.randint(800, 1000), random.randint(800, 1000))
             entrance = Portal("House", assets.IMG_HOUSE, 0.9, hitbox_size=Vec(160, 220), solid=True, hover_message="Enter? (SPACE)")
             house_world = World("House world #" + str(i), size, (100, 55, 36), (185, 153, 110), solid_border=True)
-            enemy_sets = ((4, new_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss))
+            enemy_sets = ((4, new_brawler), (3, new_ranger), (1, new_brawler_boss))
             overworld.add_dungeon(overworld.rand_pos(), new_dungeon(entrance, house_world, enemy_sets))
 
         cave_exit = Portal("Cave Exit", assets.IMG_CAVE_EXIT, 1.25, solid=False,
                            hover_message="Exit? (SPACE)", to_entity=cave_entrance)
-        caveworld.add(Vec(700, -80), cave_exit)
+        caveworld.add(Vec(750, -80), cave_exit)
         # Reference cave entrances's destination to the cave exit because now the exit is defined
-        #cave_entrance.to_world = cave_world
         cave_entrance.to_entity = cave_exit
 
-        caveworld.add_spawner(Spawner(3000, new_brawler_boss, max_num=4, pre_spawned=1))
+        caveworld.add_spawner(Spawner(2000, new_brawler_boss, max_num=4, pre_spawned=1))
 
 
         for i in range(8):
             city.add(overworld.rand_pos(), new_street_light())
         for i in range(5):
             entrance = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(150, 185), solid=True, hover_message="Enter? (SPACE)")
-            size = Vec(random.randint(600, 800), random.randint(600, 800))
+            size = Vec(random.randint(700, 900), random.randint(700, 900))
             office_world = World("Office world #" + str(i), size, (91, 108, 120), (191, 180, 147), solid_border=True)
-            enemy_sets = ((4, new_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss), (2, new_zoomer))
+            enemy_sets = ((4, new_brawler), (3, new_ranger), (2, new_boomer), (1, new_brawler_boss), (1, new_zoomer))
             city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world, enemy_sets))
 
         #city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
-        city.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=8))
-        city.add_spawner(Spawner(0, new_car, max_num=5, pre_spawned=2))
-        city.add_spawner(Spawner(6000, new_brawler, max_num=6, max_spawn=2, pre_spawned=0))
-        city.add_spawner(Spawner(18000, new_boomer, max_num=4, max_spawn=2, pre_spawned=0))
-        city.add_spawner(Spawner(45000, new_brawler_boss, max_num=2, pre_spawned=0))
+        city.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=12))
+        city.add_spawner(Spawner(6000, new_car, max_num=3, pre_spawned=1))
+        city.add_spawner(Spawner(10000, new_brawler, max_num=4, max_spawn=2, pre_spawned=0))
+        city.add_spawner(Spawner(20000, new_boomer, max_num=2, max_spawn=1, pre_spawned=0))
+        city.add_spawner(Spawner(60000, new_brawler_boss, max_num=2, pre_spawned=0))
         #city.add_spawner(Spawner(18000, new_zoomer, max_num=4, max_spawn=2, pre_spawned=0))
 
 
         frostland.add_spawner(Spawner(6000, new_winter_tree, max_num=6, center_spread=2, pre_spawned=10))
-        frostland.add_spawner(Spawner(5000, new_cold_brawler, max_num=4, max_spawn=2))
-        frostland.add_spawner(Spawner(7500, new_cooler, max_num=4, max_spawn=1))
+        frostland.add_spawner(Spawner(6000, new_cold_brawler, max_num=4, max_spawn=2))
+        frostland.add_spawner(Spawner(6000, new_cooler, max_num=4, max_spawn=1))
         frostland.add_spawner(Spawner(20000, new_freezer, max_num=2, max_spawn=1))
+        frostland.add_spawner(Spawner(45000, new_yeti, max_num=1, max_spawn=1))
 
 
         for i in range(5):
             entrance = Portal("Igloo", assets.IMG_IGLOO, 0.85, hitbox_size=Vec(185, 185), solid=True, hover_message="Enter? (SPACE)")
-            size = Vec(random.randint(500, 700), random.randint(500, 700))
+            size = Vec(random.randint(600, 800), random.randint(600, 800))
             igloo_world = World("Igloo #" + str(i), size, (200, 240, 250), (150, 210, 225), solid_border=True, music=assets.MUSIC_FIREPLACE)
             igloo_world.add(Vec(size.x/2, size.y+100), Entity("Fireplace", assets.IMG_FIREPLACE, 0.9, animate=True))
 
-            enemy_sets = ((4, new_cold_brawler), (3, new_ranger), (3, new_boomer), (1, new_brawler_boss),
+            enemy_sets = ((6, new_cold_brawler), (4, new_ranger), (3, new_boomer), (2, new_yeti),
                           (2, new_zoomer), (3, new_cooler), (1, new_freezer))
             frostland.add_dungeon(frostland.rand_pos(), new_dungeon(entrance, igloo_world, enemy_sets))
 
@@ -629,247 +677,290 @@ if __name__ == "__main__":
         for i in range(8):
             forest.add(forest.rand_pos(), new_rock())
         forest.add_spawner(Spawner(7000, new_ranger, max_num=8, max_spawn=2, pre_spawned=2))
-        forest.add_spawner(Spawner(10000, new_ranger_boss, max_num=2, pre_spawned=0))
+        forest.add_spawner(Spawner(10000, new_ranger_boss, max_num=1, pre_spawned=0))
         forest.add_spawner(Spawner(5000, new_winter_tree, max_num=16, pre_spawned=18))
 
 
-        beach.add_spawner(Spawner(8000, new_zoomer, max_num=4, max_spawn=2, center_spread=100))
-        beach.add_spawner(Spawner(10000, new_cooler, max_num=2, max_spawn=1))
+        beach.add_spawner(Spawner(8000, new_zoomer, max_num=6, max_spawn=2, center_spread=100))
+        beach.add_spawner(Spawner(10000, new_cooler, max_num=3, max_spawn=1))
         for i in range(5):
             beach.add(beach.rand_pos(), new_umbrella())
+
+        beach.add_spawner(Spawner(5000, new_palm_tree, max_num=8, pre_spawned=12))
         for i in range(5):
             beach.add(beach.rand_pos(), new_rock())
 
 
+        space_station.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=8))
+        #space_station.add_spawner(Spawner(6000, new_brawler, max_num=4, max_spawn=2, pre_spawned=0))
+        space_station.add_spawner(Spawner(6000, new_boomer, max_num=4, max_spawn=2, pre_spawned=0))
+        space_station.add_spawner(Spawner(10000, new_zoomer, max_num=4, max_spawn=2, pre_spawned=0))
+        space_station.add_spawner(Spawner(10000, new_brawler_boss, max_num=3, max_spawn=1, pre_spawned=0))
+        space_station.add_spawner(Spawner(10000, new_ranger_boss, max_num=3, max_spawn=1, pre_spawned=0))
+        space_station.add_spawner(Spawner(30000, new_yeti, max_num=2, max_spawn=1, pre_spawned=0))
+        space_station.add_spawner(Spawner(30000, new_zoomer_boss, max_num=2, max_spawn=1, pre_spawned=0))
+
+
         while not restart:
-            frames += 1
+
             Globals.delta_time = clock.tick(Globals.FPS)
-            current_world.time_elapsed += Globals.delta_time
 
-            keys_pressed = pygame.key.get_pressed()
-            interact = False
-            MOUSE_BUTTONS = pygame.mouse.get_pressed(3)
-            MOUSE_POS = Vec(pygame.mouse.get_pos())
-            MOUSE_WORLD_POS = world_pos(MOUSE_POS)
+            if paused:
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    print("Exited")
-                    pygame.quit()
-                    sys.exit()
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        print("Exited")
+                        pygame.quit()
+                        sys.exit()
+                    elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                        #if event.key == pygame.K_ESCAPE or event.key == pygame.K_SPACE:
+                        paused = False
+                        if Globals.sound_on:
+                            current_world.start_music()
+                pygame.display.flip()
 
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 3:
-                        if placeable_troops > 0:
-                            current_world.add(MOUSE_WORLD_POS, new_ally_troop())
-                            placeable_troops -= 1
+            else:
 
-                    elif event.button == 1:
-                        if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
+                frames += 1
+                current_world.time_elapsed += Globals.delta_time
+
+                keys_pressed = pygame.key.get_pressed()
+                interact = False
+                MOUSE_BUTTONS = pygame.mouse.get_pressed(3)
+                MOUSE_POS = Vec(pygame.mouse.get_pos())
+                MOUSE_WORLD_POS = world_pos(MOUSE_POS)
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        print("Exited")
+                        pygame.quit()
+                        sys.exit()
+
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        if event.button == 3:
+                            if placeable_troops > 0:
+                                current_world.add(MOUSE_WORLD_POS, new_ally_troop())
+                                placeable_troops -= 1
+
+                        elif event.button == 1:
+                            if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
+                                Globals.sound_on = not Globals.sound_on
+                                if Globals.sound_on:
+                                    current_world.start_music()
+                                else:
+                                    pygame.mixer.music.pause()
+
+                    elif event.type == pygame.KEYDOWN:
+                        debug(event.key, MOUSE_WORLD_POS)
+                        if event.key == pygame.K_ESCAPE:
+                            paused = True
+
+                        if event.key == pygame.K_SPACE:
+                            interact = True
+                        if event.key == pygame.K_r:
+                            restart = True
+                        if event.key == pygame.K_m:
                             Globals.sound_on = not Globals.sound_on
                             if Globals.sound_on:
                                 current_world.start_music()
                             else:
                                 pygame.mixer.music.pause()
 
-                        elif player.health > 0:
-                            powerups[invis] = 0
+                    elif event.type == pygame.VIDEORESIZE:
+                        Globals.SIZE = Vec(event.size)
+                        overlay = pygame.Surface(event.size).convert_alpha()
 
-                elif event.type == pygame.KEYDOWN:
-                    debug(event.key, MOUSE_WORLD_POS)
-                    if event.key == pygame.K_SPACE:
-                        interact = True
-                    if event.key == pygame.K_r:
-                        restart = True
-                    if event.key == pygame.K_m:
-                        Globals.sound_on = not Globals.sound_on
-                        if Globals.sound_on:
-                            current_world.start_music()
-                        else:
-                            pygame.mixer.music.pause()
-                    
-                elif event.type == pygame.VIDEORESIZE:
-                    Globals.SIZE = Vec(event.size)
-                    overlay = pygame.Surface(event.size).convert_alpha()
+                    elif event.type == pygame.WINDOWFOCUSLOST:
+                        paused = True
 
-            if player.health > 0 and MOUSE_BUTTONS[0]:  # Get if right click is held
-                standard_gun = True
 
-                if powerups[shotgun] > 0:
-                    standard_gun = False
-                    if pygame.time.get_ticks() - last_shotgun_time > 400:
-                        shotgun_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                        deplete_powerup(shotgun, 750)  # Deplete powerups extra when they are used
-                        last_shotgun_time = pygame.time.get_ticks()
 
-                if powerups[arrows] > 0:
-                    standard_gun = False
-                    if pygame.time.get_ticks() - last_arrow_time > 250:
-                        arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                        deplete_powerup(arrows, 500)
-                        last_arrow_time = pygame.time.get_ticks()
+                if player.health > 0 and MOUSE_BUTTONS[0]:  # Get if right click is held
+                    powerups[invis] = 0
+                    standard_gun = True
 
-                if powerups[grenade] > 0:
-                    standard_gun = False
-                    if pygame.time.get_ticks() - last_grenade_time > 400:
-                        grenade_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                        deplete_powerup(grenade, 1000)
-                        last_grenade_time = pygame.time.get_ticks()
+                    if powerups[shotgun] > 0:
+                        standard_gun = False
+                        if pygame.time.get_ticks() - last_shotgun_time > 400:
+                            shotgun_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                            deplete_powerup(shotgun, 750)  # Deplete powerups extra when they are used
+                            last_shotgun_time = pygame.time.get_ticks()
 
-                if powerups[freeze_ray] > 0:
-                    standard_gun = False
-                    if pygame.time.get_ticks() - last_freeze_ray_time > 400:
-                        freeze_ray_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                        deplete_powerup(freeze_ray, 1000)
-                        last_freeze_ray_time = pygame.time.get_ticks()
+                    if powerups[arrows] > 0:
+                        standard_gun = False
+                        if pygame.time.get_ticks() - last_arrow_time > 250:
+                            arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                            deplete_powerup(arrows, 500)
+                            last_arrow_time = pygame.time.get_ticks()
 
-                if standard_gun and pygame.time.get_ticks() - last_shoot_time > 250:
-                    single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                    last_shoot_time = pygame.time.get_ticks()
+                    if powerups[grenade] > 0:
+                        standard_gun = False
+                        if pygame.time.get_ticks() - last_grenade_time > 400:
+                            grenade_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                            deplete_powerup(grenade, 1000)
+                            last_grenade_time = pygame.time.get_ticks()
 
-            if current_world.complete_condition is not None and not current_world.completed:
-                if current_world.complete_condition(current_world):
-                    current_world.completed = True
-                    next_sign = Portal("Next Sign", assets.IMG_NEXT_SIGN, 0.5, hover_message="Next world? (SPACE)",
-                                hitbox_size=Vec(125, 125), solid=True)
-                    current_world.add(current_world.rand_pos(), next_sign)
-                    next_sign.to_world = worlds[worlds.index(current_world) + 1]
+                    if powerups[freeze_ray] > 0:
+                        standard_gun = False
+                        if pygame.time.get_ticks() - last_freeze_ray_time > 400:
+                            freeze_ray_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                            deplete_powerup(freeze_ray, 1000)
+                            last_freeze_ray_time = pygame.time.get_ticks()
 
-                    if current_world != worlds[0]:
-                        last_sign = Portal("Last Sign", assets.IMG_LAST_SIGN, 0.5, hover_message="Last world? (SPACE)",
+                    if standard_gun and pygame.time.get_ticks() - last_shoot_time > 250:
+                        single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                        last_shoot_time = pygame.time.get_ticks()
+
+                if current_world.complete_condition is not None and not current_world.completed:
+                    if current_world.complete_condition(current_world):
+                        current_world.completed = True
+                        next_sign = Portal("Next Sign", assets.IMG_NEXT_SIGN, 0.5, hover_message="Next world? (SPACE)",
                                     hitbox_size=Vec(125, 125), solid=True)
-                        current_world.add(current_world.rand_pos(), last_sign)
-                        last_sign.to_world = worlds[worlds.index(current_world) - 1]
+                        current_world.add(current_world.rand_pos(), next_sign)
+                        next_sign.to_world = worlds[worlds.index(current_world) + 1]
 
-            # Destroy dungeons whose enemies have been defeated
-            for dungeon in current_world.dungeons:
-                if dungeon in current_world.entities:
-                    if len(dungeon.destination_world().enemies) == 0:
-                        dungeon.world.remove(dungeon)
-                        spawn_explosion(dungeon, dungeon.world, team=player)
-                        current_world.dungeons_defeated += 1
+                        if current_world != worlds[0]:
+                            last_sign = Portal("Last Sign", assets.IMG_LAST_SIGN, 0.5, hover_message="Last world? (SPACE)",
+                                        hitbox_size=Vec(125, 125), solid=True)
+                            current_world.add(current_world.rand_pos(), last_sign)
+                            last_sign.to_world = worlds[worlds.index(current_world) - 1]
 
+                if paused:
+                    overlay.fill((0, 0, 0, 70))
+                    overlay.blit(assets.IMG_PAUSE, util.rect_center(Vec(window.get_size())/2, Vec(0, 0)))
+                    window.blit(overlay, (0, 0))
+                    pygame.mixer.music.pause()
+                    continue
 
-            # Automatically deplete powerups as time goes on
-            deplete_powerup(shotgun, Globals.delta_time)
-            deplete_powerup(grenade, Globals.delta_time)
-            deplete_powerup(arrows, Globals.delta_time)
-            deplete_powerup(freeze_ray, Globals.delta_time)
-            deplete_powerup(invis, Globals.delta_time)
-            deplete_powerup(metalsuit, Globals.delta_time)
+                # Destroy dungeons whose enemies have been defeated
+                for dungeon in current_world.dungeons:
+                    if dungeon in current_world.entities:
+                        if len(dungeon.destination_world().enemies) == 0:
+                            dungeon.world.remove(dungeon)
+                            spawn_explosion(dungeon, dungeon.world, team=player)
+                            current_world.dungeons_defeated += 1
 
-            # Speed up with speed shoes but slow down with metalsuit
-            if powerups[speed_shoes] > 0:
-                if powerups[metalsuit] > 0:
-                    player.speed = player_speed * 1.25
-                else:
-                    player.speed = player_speed * 1.4
+                # Automatically deplete powerups as time goes on
+                deplete_powerup(shotgun, Globals.delta_time)
+                deplete_powerup(grenade, Globals.delta_time)
+                deplete_powerup(arrows, Globals.delta_time)
+                deplete_powerup(freeze_ray, Globals.delta_time)
+                deplete_powerup(metalsuit, Globals.delta_time)
+                deplete_powerup(invis, Globals.delta_time)
                 deplete_powerup(speed_shoes, Globals.delta_time)
-            else:
-                if powerups[metalsuit] > 0:
-                    player.speed = player_speed * 0.8
-                else:
-                    player.speed = player_speed
 
-            if powerups[invis] > 0:
-                player.set_image(assets.IMG_PLAYER_INVIS)
-            elif powerups[metalsuit] > 0:
-                player.set_image(assets.IMG_PLAYER_METALSUIT)
-                player.invincible = True
-                player.take_knockback = False
-            else:
-                player.invincible = False
-                player.take_knockback = True
-
-            if powerups[metalsuit] <= 0 and powerups[invis] <= 0:
-                if player.current_image is not assets.IMG_PLAYER_OW and player.current_image is not assets.IMG_PLAYER_DEAD:
-                    player.set_image(assets.IMG_PLAYER_ALIVE)
-
-            player.control(keys_pressed)
-
-            for s in current_world.spawners:
-                s.update(current_world)
-
-            for e in current_world.entities:
-                e.update(current_world, player)
-
-            for e in current_world.entities:
-                for other in current_world.entities:
-                    if e is not other and e.colliding(other):
-                        e.collide(other, current_world)
-                        e.last_collisions.add(other)
+                # Speed up with speed shoes but slow down with metalsuit
+                if powerups[speed_shoes] > 0:
+                    if powerups[metalsuit] > 0:
+                        player.speed = player_speed * 1.25
                     else:
-                        e.last_collisions.discard(other)
-
-                if not e.alive:
-                    current_world.remove(e)
-
-            if current_world.dark:
-                # Overlay transparent background to make some worlds darker
-                overlay.fill((0, 0, 0, 70))
-            else:
-                overlay.fill((0, 0, 0, 0))
-
-            # Render the game's foreground layer
-            window.fill(current_world.outer_color)
-            blit_pos = -player.pos + Globals.SIZE/2
-            current_world.render(window, blit_pos)
-
-            current_world.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
-            for e in current_world.entities:
-                e.render(window, overlay, screen_pos(Vec(e.hitbox().center)))
-
-
-            # Render overlay layer
-            if Globals.show_overlay:
-                stats = [
-                    "# Existing Troops: " + str(len(current_world.allies)),
-                    "# Placeable Troops: " + str(placeable_troops) + "  (Right click)",
-                    "Position: " + str(player.pos.rounded()),
-                    "World: " + current_world.name,
-                    "Damage Multiplier: * " + str(round(player.damage_multiplier, 1)),
-                    "Health: " + str(max(0, round(player.health))) + "/" + str(max(0, round(player.max_health))),
-                ]
-
-                if Globals.debug_mode:
-                    stats.append("# Entities: " + str(len(current_world.entities)))
-                    stats.append("FPS: " + str(round(clock.get_fps(), 1)))
-                    stats.append("Time: " + str(current_world.time_elapsed/1000))
-
-                util.draw_bar(overlay, Vec(115, Globals.SIZE.y - 35 * 6 - 6), Vec(200, 33),
-                              player.health / player.max_health, (80, 130, 255), (0, 0, 0), center=False)
-
-                stat_y = Globals.SIZE.y - 15  # - 35
-                for stat in stats:
-                    stat_y -= 35
-                    util.write(overlay, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
-
-                if player.health <= 0:
-                    util.write(overlay, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE/2 + Vec(0, 100), (255, 255, 255),
-                               center=True)
-                x = 0
-                y = 0
-                for powerup in powerups:
-                    if powerups[powerup] > 0:
-                        image_size =  powerup.image.get_width()/2
-                        image_pos = Vec(Globals.SIZE.x - 95 + image_size/2, 5 + image_size/2) + (Vec(-x * 80, y * 110))
-                        overlay.blit(powerup.image, image_pos.tuple())
-                        timer_value = min(powerups[powerup] / powerup.current_max, 1)
-                        util.draw_bar(overlay, image_pos + Vec(35, 85), Vec(50, 6), timer_value, (255, 255, 255),
-                                      (100, 100, 100), center=True)
-                        x += 1
-                        if x >= 3:
-                            x = 0
-                            y += 1
-
-                sound_icon = None
-                if Globals.sound_on:
-                   sound_icon = assets.IMG_SOUND_ON
+                        player.speed = player_speed * 1.4
                 else:
-                   sound_icon = assets.IMG_SOUND_OFF
-                overlay.blit(sound_icon, (0, 0))
+                    if powerups[metalsuit] > 0:
+                        player.speed = player_speed * 0.8
+                    else:
+                        player.speed = player_speed
 
-            draw_cursor(overlay)
+                if powerups[invis] > 0:
+                    player.set_image(assets.IMG_PLAYER_INVIS)
+                elif powerups[metalsuit] > 0:
+                    player.set_image(assets.IMG_PLAYER_METALSUIT)
+                    player.invincible = True
+                    player.take_knockback = False
+                else:
+                    player.invincible = False
+                    player.take_knockback = True
 
-            window.blit(overlay, (0, 0))
-            pygame.display.flip()
+                if powerups[metalsuit] <= 0 and powerups[invis] <= 0:
+                    if player.current_image is not assets.IMG_PLAYER_OW and player.current_image is not assets.IMG_PLAYER_DEAD:
+                        player.set_image(assets.IMG_PLAYER_ALIVE)
+
+                player.control(keys_pressed)
+
+                for s in current_world.spawners:
+                    s.update(current_world)
+
+                for e in current_world.entities:
+                    e.update(current_world, player)
+
+                for e in current_world.entities:
+                    for other in current_world.entities:
+                        if e is not other and e.colliding(other):
+                            e.collide(other, current_world)
+                            e.last_collisions.add(other)
+                        else:
+                            e.last_collisions.discard(other)
+
+                    if not e.alive:
+                        current_world.remove(e)
+
+                if current_world.dark:
+                    # Overlay transparent background to make some worlds darker
+                    overlay.fill((0, 0, 0, 70))
+                else:
+                    overlay.fill((0, 0, 0, 0))
+
+                # Render the game's foreground layer
+                window.fill(current_world.outer_color)
+                blit_pos = -player.pos + Globals.SIZE/2
+                current_world.render(window, blit_pos)
+
+                current_world.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
+                for e in current_world.entities:
+                    e.render(window, overlay, screen_pos(Vec(e.hitbox().center)))
+
+
+                # Render overlay layer
+                if Globals.show_overlay:
+                    stats = [
+                        #"Troops To Place: " + str(placeable_troops) + "/" + str(placeable_troops + len(current_world.allies)) + " (Right click)",
+                        "Existing Troops: " + str(len(current_world.allies)),
+                        "Placeable Troops: " + str(placeable_troops) + "  (Right click)",
+                        #"Position: " + str(player.pos.rounded()),
+                        "World: " + current_world.name,
+                        "Damage: x " + str(round(player.damage_multiplier, 1)),
+                        "Health: " + str(max(0, math.floor(player.health))) + "/" + str(max(0, round(player.max_health))),
+                    ]
+
+                    if Globals.debug_mode:
+                        stats.append("# Entities: " + str(len(current_world.entities)))
+                        stats.append("FPS: " + str(round(clock.get_fps(), 1)))
+                        stats.append("Time: " + str(current_world.time_elapsed/1000))
+
+                    util.draw_bar(overlay, Vec(114, Globals.SIZE.y - 35 * 5 - 6), Vec(200, 33),
+                                  player.health / player.max_health, (80, 130, 255), (0, 0, 0), center=False)
+
+                    stat_y = Globals.SIZE.y - 15  # - 35
+                    for stat in stats:
+                        stat_y -= 35
+                        util.write(overlay, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
+
+                    if player.health <= 0:
+                        util.write(overlay, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE/2 + Vec(0, 100), (255, 255, 255),
+                                   center=True)
+                    x = 0
+                    y = 0
+                    for powerup in powerups:
+                        if powerups[powerup] > 0:
+                            image_size =  powerup.image.get_width()/2
+                            image_pos = Vec(Globals.SIZE.x - 95 + image_size/2, 5 + image_size/2) + (Vec(-x * 80, y * 110))
+                            overlay.blit(powerup.image, image_pos.tuple())
+                            timer_value = min(powerups[powerup] / powerup.current_max, 1)
+                            util.draw_bar(overlay, image_pos + Vec(35, 85), Vec(50, 6), timer_value, (255, 255, 255),
+                                          (100, 100, 100), center=True)
+                            x += 1
+                            if x >= 3:
+                                x = 0
+                                y += 1
+
+                    sound_icon = None
+                    if Globals.sound_on:
+                       sound_icon = assets.IMG_SOUND_ON
+                    else:
+                       sound_icon = assets.IMG_SOUND_OFF
+                    overlay.blit(sound_icon, (0, 0))
+
+                draw_cursor(overlay)
+
+                window.blit(overlay, (0, 0))
+                pygame.display.flip()

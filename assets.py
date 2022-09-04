@@ -102,6 +102,7 @@ IMG_CURSOR_ARROW = load_image("ui_cursor_arrow.png")
 IMG_CURSOR_TARGET = load_image("ui_cursor_target.png")
 IMG_SOUND_ON = util.scale_image(load_image("ui_sound_on.png"), 0.4)
 IMG_SOUND_OFF = util.scale_image(load_image("ui_sound_off.png"), 0.4)
+IMG_PAUSE = util.scale_image(load_image("ui_pause.png"), 0.4)
 
 
 IMG_BG_CITY = load_image("bg_city_alt.png")
@@ -123,6 +124,7 @@ IMG_CAR_FRONT = load_image("car_front.png")
 IMG_CAR_SIDE = load_image("car_side.png")
 IMG_COOLER = load_image("cooler.png")
 IMG_FREEZER = load_image("freezer.png")
+IMG_YETI = load_image("yeti.png")
 
 IMG_TROOP = load_image("troop.png")
 
@@ -142,6 +144,7 @@ IMG_TREE_WINTER = load_image("tree_winter.png")
 IMG_ROCK = load_image("rock.png")
 IMG_STREET_LIGHT = load_image("street_light.png")
 IMG_UMBRELLA = load_image("umbrella.png")
+IMG_TREE_PALM = load_image("tree_palm.png")
 
 IMG_GRAVE = load_image("grave.png")
 IMG_OFFICE = load_image("office.png")
