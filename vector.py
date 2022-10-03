@@ -56,7 +56,12 @@ class Vec:
     def angle(self):
         return -math.degrees(math.atan2(self.y, self.x))
 
+    """ Get the rounded version of the vector """
     def rounded(self):
+        return Vec(round(self.x), round(self.y))
+
+    """ Get the rounded down version of the vector """
+    def floored(self):
         return Vec(round(self.x), round(self.y))
     
     """ Get the normalized vector, keeping the ratio of the components """

@@ -33,18 +33,18 @@ from world import World, Spawner
 
 
 def new_tree():
-    return Entity("Tree", assets.IMG_TREE, 0.675, health=25, solid=True, hitbox_size=Vec(50, 165), death_func=tree_loot)
+    return Entity("Tree", assets.IMG_TREE, 0.675, health=15, solid=True, hitbox_size=Vec(50, 165), death_func=tree_loot)
 
 def new_city_tree():
-    return Entity("City Tree", assets.IMG_TREE_CITY, 0.675, health=30, solid=True, hitbox_size=Vec(55, 170),
+    return Entity("City Tree", assets.IMG_TREE_CITY, 0.675, health=20, solid=True, hitbox_size=Vec(55, 170),
                   death_func=tree_loot)
 
 def new_winter_tree():
-    return Entity("Winter Tree", assets.IMG_TREE_WINTER, 0.675, health=35, solid=True, hitbox_size=Vec(30, 320),
+    return Entity("Winter Tree", assets.IMG_TREE_WINTER, 0.675, health=25, solid=True, hitbox_size=Vec(30, 320),
                   death_func=tree_loot)
 
 def new_palm_tree():
-    return Entity("Palm Tree", assets.IMG_TREE_PALM, 0.675, health=40, solid=True, hitbox_size=Vec(30, 150),
+    return Entity("Palm Tree", assets.IMG_TREE_PALM, 0.675, health=30, solid=True, hitbox_size=Vec(30, 150),
                   death_func=tree_loot)
 
 def new_rock():
@@ -81,18 +81,18 @@ def new_cold_brawler():
     return AIEntity("Brawler", assets.IMG_BRAWLER_COLD, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, death_func=brawler_loot)
 
 def new_brawler_boss():
-    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.65, ENEMY, 50, 3, 1500, 0.035, 1000, 225,
+    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.65, ENEMY, 25, 3, 1500, 0.035, 1000, 225,
                     hitbox_size=Vec(128, 128), death_func=brawler_boss_loot)
     boss.take_knockback = False
     return boss
 
 def new_ranger():
-    return RangedAIEntity("Ranger", assets.IMG_RANGER, 0.25, speed=0.4, team=ENEMY, health=4, damage=1, sight_range=700,
+    return RangedAIEntity("Ranger", assets.IMG_RANGER, 0.25, speed=0.4, team=ENEMY, health=3, damage=1, sight_range=700,
                           follow_weight=0.08, atk_interval=2000, retreat_range=350, weapon_func=arrow_shot,
                           death_func=ranger_loot, hitbox_size=Vec(64, 64))
 
 def new_ranger_boss():
-    return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, speed=0.5, team=ENEMY, health=35, damage=1, sight_range=800,
+    return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, speed=0.5, team=ENEMY, health=20, damage=1, sight_range=800,
                           follow_weight=0.05, atk_interval=1000, retreat_range=350, weapon_func=arrow_shot,
                           death_func=ranger_boss_loot, hitbox_size=Vec(100, 100))
 
@@ -101,12 +101,12 @@ def new_boomer():
                           weapon_func=grenade_shot, death_func=boomer_loot, hitbox_size=Vec(70, 70))
 
 def new_zoomer():
-    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.55, team=ENEMY, health=12, damage=2, sight_range=300,
+    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.55, team=ENEMY, health=6, damage=2, sight_range=300,
                           follow_weight=0.05, atk_interval=300, retreat_range=200,
                           weapon_func=single_shot, death_func=zoomer_loot, hitbox_size=Vec(70, 70))
 
 def new_car():
-    car = AIEntity("Car", assets.IMG_CAR_FRONT, 0.5, 0.5, ENEMY, health=14, damage=2, sight_range=300, follow_weight=0.1,
+    car = AIEntity("Car", assets.IMG_CAR_FRONT, 0.5, 0.5, ENEMY, health=12, damage=2, sight_range=300, follow_weight=0.1,
                     atk_interval=5000, retreat_range=400, death_func=car_loot, hitbox_size=Vec(110, 80))
 
     car.right_image = assets.IMG_CAR_SIDE
@@ -115,7 +115,7 @@ def new_car():
 
 def new_cooler():
     return RangedAIEntity("Cooler", assets.IMG_COOLER, 0.4, speed=0.45, team=ENEMY, health=8, damage=1, sight_range=600,
-                          follow_weight=0.05, atk_interval=5000, retreat_range=250, weapon_func=freeze_ray_shot,
+                          follow_weight=0.05, atk_interval=4500, retreat_range=250, weapon_func=freeze_ray_shot,
                           death_func=cooler_loot, hitbox_size=Vec(80, 80))
 
 def new_freezer():
@@ -125,7 +125,7 @@ def new_freezer():
 
 def new_yeti():
     boss = AIEntity("Yeti", assets.IMG_YETI, 0.5, speed=0.65, team=ENEMY, health=60, damage=3, sight_range=1500,
-                    follow_weight=0.035, atk_interval=300, retreat_range=225, hitbox_size=Vec(128, 128),
+                    follow_weight=0.035, atk_interval=350, retreat_range=225, hitbox_size=Vec(128, 128),
                     death_func=yeti_loot)
     boss.take_knockback = False
     return boss
@@ -133,60 +133,55 @@ def new_yeti():
 
 def new_zoomer_boss():
     return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.5, speed=0.75, team=ENEMY, health=65, damage=2, sight_range=600,
-                          follow_weight=0.05, atk_interval=150, retreat_range=200,
+                          follow_weight=0.05, atk_interval=200, retreat_range=200,
                           weapon_func=single_shot, death_func=zoomer_boss_loot, hitbox_size=Vec(128, 200))
 
 
-def new_ally_troop():
+def new_troop():
     return RangedAIEntity("Troop", assets.IMG_TROOP, 0.275, 0.4, ALLY, health=8, damage=player.damage_multiplier, sight_range=600, follow_weight=0.05,
                           atk_interval=1500, retreat_range=350, weapon_func=single_shot, hitbox_size=Vec(64, 64))
 
 
 def new_apple_item():
-    return Item("Apple", assets.IMG_APPLE, 0.25, lambda: player.heal(10), condition=player.can_heal)
+    return ItemEntity("Apple", assets.IMG_APPLE, 0.25, lambda: player.heal(10), condition=player.can_heal)
 
 def new_dmg_up_item():
-    return Item("Dmg Up", assets.IMG_DMG_UP, 0.25, lambda: player.raise_damage_multiplier(0.5))
+    return ItemEntity("Dmg Up", assets.IMG_DMG_UP, 0.25, lambda: player.raise_damage_multiplier(0.5))
 
 def new_shield_item():
-    return Item("Shield", assets.IMG_SHIELD, 0.25, lambda: player.raise_max_health(10))
+    return ItemEntity("Shield", assets.IMG_SHIELD, 0.25, lambda: player.raise_max_health(10))
 
 
 def new_shotgun_item():
-    return Item("Shotgun", assets.IMG_SHOTGUN, 0.25, lambda: gain_powerup(shotgun))
+    return ItemEntity("Shotgun", assets.IMG_SHOTGUN, 0.25, lambda: shotgun.gain(8))
 
 def new_arrows_item():
-    return Item("Arrows", assets.IMG_ARROWS, 0.25, lambda: gain_powerup(arrows))
+    return ItemEntity("Arrows", assets.IMG_ARROWS, 0.25, lambda: arrows.gain(8))
 
 def new_grenade_item():
-    return Item("Grenade", assets.IMG_GRENADE, 0.25, lambda: gain_powerup(grenade))
+    return ItemEntity("Grenade", assets.IMG_GRENADE, 0.25, lambda: grenade.gain(6))
 
 def new_freeze_ray_item():
-    return Item("Freeze Ray", assets.IMG_FREEZE_RAY, 0.25, lambda: gain_powerup(freeze_ray))
+    return ItemEntity("Freeze Ray", assets.IMG_FREEZE_RAY, 0.25, lambda: freeze_ray.gain(8))
 
 def new_speed_item():
-    return Item("Speed Shoes", assets.IMG_SPEED_SHOES, 0.25, lambda: gain_powerup(speed_shoes))
+    return ItemEntity("Speed Shoes", assets.IMG_SPEED_SHOES, 0.25, lambda: player.raise_effect_time("speed", 8000))
 
 def new_metalsuit_item():
-    return Item("Metalsuit", assets.IMG_METALSUIT, 0.25, lambda: gain_powerup(metalsuit))
+    return ItemEntity("Metalsuit", assets.IMG_METALSUIT, 0.25, lambda: player.raise_effect_time("metalsuit", 8000))
 
 def new_invis_item():
-    return Item("Invis", assets.IMG_PLAYER_INVIS, 0.25, lambda: gain_powerup(invis))
+    return ItemEntity("Invis", assets.IMG_PLAYER_INVIS, 0.25, lambda: player.raise_effect_time("invisible", 5000))
 
 def new_troops_item():
-    return Item("Troops", assets.IMG_TROOP, 0.18, lambda: increase_troops())#current_world.add(player.pos - Vec(0, 5), new_ally()))
-
-def increase_troops(num=1):
-    global placeable_troops
-    assets.play_sound(assets.SFX_COLLECT)
-    placeable_troops += num
+    return ItemEntity("Troops", assets.IMG_TROOP, 0.18, lambda: placeable_troop.gain(2))
 
 
 def new_bullet(parent, team, direction, Range):
-    image_scale = 1
+    image_scale = 0.8
     if parent is player:
-        image_scale = 1 + (0.1 * player.damage_multiplier)
-    return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, image_scale, 1.25, team, None, 2, direction, Range, parent=parent,
+        image_scale += (0.1 * player.damage_multiplier)
+    return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, image_scale, 1.25, team, None, 1, direction, Range, parent=parent,
                       death_func=spawn_poof, blockable=True)
 
 def single_shot(world, parent, team, direction):
@@ -206,7 +201,7 @@ def shotgun_shot(world, parent, team, direction):
 
 def arrow_shot(world, parent, team, direction):
     assets.play_sound(assets.SFX_SHOOT_ARROW, parent.pos, player.pos)
-    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.8, team, None, 1.5, direction, 750, parent=parent,
+    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.8, team, None, 2, direction, 750, parent=parent,
                        death_func=spawn_poof, blockable=False, hitbox_size=Vec(36, 36))
     world.add(parent.pos, arrow)
 
@@ -223,7 +218,7 @@ def freeze_ray_shot(world, parent, team, direction):
     world.add(parent.pos, s)
 
 def spawn_grave(self, world, team):
-    world.add(self.pos, Entity("Grave", assets.IMG_GRAVE, 0.35, health=50, team=team, solid=True, death_func=spawn_explosion))
+    world.add(self.pos, Entity("Grave", assets.IMG_GRAVE, 0.35, health=30, team=team, solid=True, death_func=spawn_explosion))
 
 def spawn_explosion(self, world, team):
     assets.play_sound(assets.SFX_BOOM, self.pos, player.pos)
@@ -344,24 +339,40 @@ def draw_cursor(surface):
     surface.blit(cursor, rect)
 
 
-
 class Player(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, death_func=None, hurt_func=None):
         super().__init__(name, image, image_scale, team, health, death_func=death_func)
         self.speed = speed
         self.hurt_func = hurt_func
         self.is_player = True
-        self.invisible = False
         self.damage_multiplier = 1
+        self.mercury_wings = assets.IMG_MERCURY_WINGS
+
+        self.effects = {
+            "speed": 0,
+            "metalsuit": 0,
+            "invisible": 0,
+        }
 
     def update(self, world, player):
         super().update(world, player)
-        if self.shake_timer <= 0 and powerups[metalsuit] <= 0 and powerups[invis] <= 0:
+        if self.shake_timer <= 0 and self.effects["metalsuit"] <= 0 and self.effects["invisible"] <= 0:
             self.set_image(assets.IMG_PLAYER_ALIVE)
 
-        self.invisible = powerups[invis] > 0
         self.health += 0.000125 * Globals.delta_time
         self.health = min(self.health, self.max_health)
+        self.manage_effects()
+
+    def render(self, surface, overlay_surface, pos):
+        super().render(surface, overlay_surface, pos)
+
+        if self.effects["speed"] > 0:
+            wings_img = util.scale_image(self.mercury_wings, self.image_scale)
+            surface.blit(wings_img, (pos - Vec(wings_img.get_size()) / 2).tuple())
+
+        # draw item in hand
+        hand_pos = pos + Vec(25, 10)
+        surface.blit(pygame.transform.scale(get_selected_item().image, (30, 30)), hand_pos.tuple())
 
     def control(self, keys):
         horizontal = False
@@ -400,12 +411,12 @@ class Player(Entity):
                 self.keep_in_bounds(new_world)
             interact = False
 
-
     def hurt(self, amount, world):
         super().hurt(amount, world)
         self.shake_timer = 150
-        deplete_powerup(metalsuit, amount*500)
-        if powerups[metalsuit] <= 0 and powerups[invis] <= 0:
+
+        self.effects["metalsuit"] -= 100
+        if self.effects["metalsuit"] <= 0 and self.effects["invisible"] <= 0:
             self.set_image(assets.IMG_PLAYER_OW)
 
     def heal(self, amount):
@@ -425,47 +436,81 @@ class Player(Entity):
         self.damage_multiplier += amount
         assets.play_sound(assets.SFX_BUFF)
 
+    def raise_effect_time(self, stat_name, time):
+        self.effects[stat_name] += time
+
+    def manage_effects(self):
+        self.effects["speed"] -= Globals.delta_time
+        self.effects["metalsuit"] -= Globals.delta_time
+        self.effects["invisible"] -= Globals.delta_time
+        self.effects["speed"] = max(self.effects["speed"], 0)
+        self.effects["metalsuit"] = max(self.effects["metalsuit"], 0)
+        self.effects["invisible"] = max(self.effects["invisible"], 0)
+
+        if self.effects["speed"] > 0:
+            if self.effects["metalsuit"] > 0:
+                self.speed = player_speed * 1.3
+            else:
+                self.speed = player_speed * 1.75
+        else:
+            if self.effects["metalsuit"] > 0:
+                self.speed = player_speed * 0.8
+            else:
+                self.speed = player_speed
+
+        if self.effects["invisible"] > 0:
+            self.set_image(assets.IMG_PLAYER_INVIS)
+        elif self.effects["metalsuit"] > 0:
+            player.set_image(assets.IMG_PLAYER_METALSUIT)
+            player.invincible = True
+            player.take_knockback = False
+        else:
+            player.invincible = False
+            player.take_knockback = True
+            if player.current_image is not assets.IMG_PLAYER_OW and player.current_image is not assets.IMG_PLAYER_DEAD:
+                player.set_image(assets.IMG_PLAYER_ALIVE)
+
 
 def set_world(new_world):
     global current_world
-
     if player in current_world.entities:
         current_world.remove(player)
-
         # Switch music if new world's song is different. Else, continue the old song
         if new_world.music != current_world.music:
             new_world.start_music()
-
         current_world = new_world
         new_world.add(Vec(new_world.size/2), player)
 
 
-
-class Powerup:
-    def __init__(self, name, image, default_amount):
+class Item:
+    def __init__(self, name, image, amount):
         self.name = name
         self.image = util.scale_image(image, 0.25)
-        self.default_amount = default_amount
-        self.current_max = default_amount
+        self.amount = amount
 
-# Add time/uses from powerup
-def gain_powerup(powerup, amount=None):
-    if amount is None:
-        amount = powerup.default_amount
-    powerups[powerup] += amount
-    assets.play_sound(assets.SFX_COLLECT)
-    #powerups[powerup] = min(powerups[powerup], powerup.default_amount)
-    powerup.current_max = powerups[powerup]
+    def gain(self, amount=1):
+        if self not in current_items:
+            current_items.append(self)
+        self.amount += amount
+        assets.play_sound(assets.SFX_COLLECT)
 
-# Remove time/uses from powerup
-def deplete_powerup(powerup, amount):
-    if powerups[powerup] > 0:
-        powerups[powerup] -= amount
-        powerups[powerup] = max(powerups[powerup], 0)
+    def deplete(self, amount=1):
+        if self.amount > 0:
+            self.amount -= amount
+            if self.amount <= 0 and self in current_items:
+                current_items.remove(self)
 
 
+def get_selected_item():
+    global selected_index
+    if selected_index < 0:
+        selected_index = len(current_items) - 1
+    elif selected_index > len(current_items) - 1:
+        selected_index = 0
+    return current_items[selected_index]
 
-def debug(key, mouse_world_pos):
+
+def cheats(key, mouse_world_pos):
     if key == pygame.K_j:
         current_world.add(mouse_world_pos, new_brawler())
     elif key == pygame.K_k:
@@ -477,7 +522,7 @@ def debug(key, mouse_world_pos):
     elif key == pygame.K_QUOTE:
         current_world.add(mouse_world_pos, new_car())
     elif key == pygame.K_h:
-        current_world.add(mouse_world_pos, new_ally_troop())
+        current_world.add(mouse_world_pos, new_troop())
     elif key == pygame.K_t:
         current_world.add(mouse_world_pos, new_ranger_boss())
     elif key == pygame.K_y:
@@ -497,7 +542,6 @@ def debug(key, mouse_world_pos):
         current_world.add(mouse_world_pos, new_shield_item())
     elif key == pygame.K_3:
         current_world.add(mouse_world_pos, new_dmg_up_item())
-
     elif key == pygame.K_4:
         current_world.add(mouse_world_pos, new_shotgun_item())
     elif key == pygame.K_5:
@@ -515,12 +559,7 @@ def debug(key, mouse_world_pos):
     elif key == pygame.K_MINUS:
         current_world.add(mouse_world_pos, new_freeze_ray_item())
 
-    elif key == pygame.K_v:
-        Globals.debug_mode = not Globals.debug_mode
-    #elif key == pygame.K_c:
-    #    Globals.show_overlay = not Globals.show_overlay
-
-    elif key == pygame.K_b:
+    elif key == pygame.K_b: # Go to previous world
         if current_world in worlds:
             index = worlds.index(current_world) - 1
             index = util.wraparound(index, 0, len(worlds) - 1)
@@ -528,13 +567,14 @@ def debug(key, mouse_world_pos):
         else:
             set_world(worlds[0])
 
-    elif key == pygame.K_n:
+    elif key == pygame.K_n: # Go to next world
         if current_world in worlds:
             index = worlds.index(current_world) + 1
             index = util.wraparound(index, 0, len(worlds) - 1)
             set_world(worlds[index])
         else:
             set_world(worlds[0])
+
 
 
 running = True
@@ -545,34 +585,22 @@ if __name__ == "__main__":
         restart = False
         frames = 0
 
+        standard_gun = Item("Standard Gun", assets.IMG_STANDARD_GUN, -1)
+        shotgun = Item("Shotgun", assets.IMG_SHOTGUN, 0)
+        arrows = Item("Arrows", assets.IMG_ARROWS, 0)
+        grenade = Item("Grenade", assets.IMG_GRENADE, 0)
+        freeze_ray = Item("Freeze Ray", assets.IMG_FREEZE_RAY, 0)
+        placeable_troop = Item("Placeable Troop", assets.IMG_TROOP, 0)
 
-        shotgun = Powerup("Shotgun", assets.IMG_SHOTGUN, 12500)
-        arrows = Powerup("Arrows", assets.IMG_ARROWS, 16000)
-        grenade = Powerup("Grenade", assets.IMG_GRENADE, 16000)
-        freeze_ray = Powerup("Freeze Ray", assets.IMG_FREEZE_RAY, 12500)
-        speed_shoes = Powerup("Speed", assets.IMG_SPEED_SHOES, 10000)
-        invis = Powerup("Invis", assets.IMG_PLAYER_INVIS, 8000)
-        metalsuit = Powerup("Metalsuit", assets.IMG_METALSUIT, 10000)
-
-        # Amount of time/uses left for each powerup
-        powerups = {
-            shotgun: 0,
-            arrows: 0,
-            grenade: 0,
-            freeze_ray: 0,
-            speed_shoes: 0,
-            metalsuit: 0,
-            invis: 0,
-        }
+        selected_index = 0
+        alL_items = (standard_gun, shotgun, arrows, grenade, freeze_ray, placeable_troop)
+        current_items = [standard_gun]
 
         last_shoot_time = 0
         last_shotgun_time = 0
         last_arrow_time = 0
         last_grenade_time = 0
         last_freeze_ray_time = 0
-
-        placeable_troops = 0
-
 
         worlds = []
 
@@ -583,7 +611,7 @@ if __name__ == "__main__":
         #image=assets.IMG_BG_CITY)
         worlds.append(city)
 
-        frostland = World("Frostland", Vec(3000, 3500), (200, 240, 250), (150, 210, 225), music=assets.MUSIC_WINTER)
+        frostland = World("Frostland", Vec(3000, 3500), (200, 230, 240), (150, 210, 225), music=assets.MUSIC_WINTER)
         worlds.append(frostland)
 
         forest = World("Forest", Vec(2500, 2500), (13, 46, 37), (38, 75, 60), dark=True, music=assets.MUSIC_FOREST,
@@ -617,7 +645,7 @@ if __name__ == "__main__":
             overworld.add(overworld.rand_pos(), new_rock())
 
         overworld.add_spawner(Spawner(8000, new_tree, max_num=10, center_spread=1.25, pre_spawned=10))
-        overworld.add_spawner(Spawner(8000, new_brawler, max_num=6, max_spawn=3))
+        overworld.add_spawner(Spawner(8000, new_brawler, max_num=6, max_spawn=2))
         overworld.add_spawner(Spawner(10000, new_ranger, max_num=3, max_spawn=1))
         #overworld.add_spawner(Spawner(10000, new_ranger, max_num=3))
         overworld.add_spawner(Spawner(45000, new_brawler_boss, max_num=1))
@@ -651,7 +679,7 @@ if __name__ == "__main__":
         city.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=12))
         city.add_spawner(Spawner(6000, new_car, max_num=3, pre_spawned=1))
         city.add_spawner(Spawner(10000, new_brawler, max_num=4, max_spawn=2, pre_spawned=0))
-        city.add_spawner(Spawner(20000, new_boomer, max_num=2, max_spawn=1, pre_spawned=0))
+        city.add_spawner(Spawner(20000, new_boomer, max_num=1, max_spawn=1, pre_spawned=0))
         city.add_spawner(Spawner(60000, new_brawler_boss, max_num=2, pre_spawned=0))
         #city.add_spawner(Spawner(18000, new_zoomer, max_num=4, max_spawn=2, pre_spawned=0))
 
@@ -706,29 +734,26 @@ if __name__ == "__main__":
             Globals.delta_time = clock.tick(Globals.FPS)
 
             if paused:
-
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         print("Exited")
                         pygame.quit()
                         sys.exit()
                     elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-                        #if event.key == pygame.K_ESCAPE or event.key == pygame.K_SPACE:
                         paused = False
                         if Globals.sound_on:
                             current_world.start_music()
                 pygame.display.flip()
 
             else:
-
                 frames += 1
                 current_world.time_elapsed += Globals.delta_time
-
-                keys_pressed = pygame.key.get_pressed()
-                interact = False
+                KEYS_PRESSED = pygame.key.get_pressed()
                 MOUSE_BUTTONS = pygame.mouse.get_pressed(3)
                 MOUSE_POS = Vec(pygame.mouse.get_pos())
                 MOUSE_WORLD_POS = world_pos(MOUSE_POS)
+
+                interact = False
 
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
@@ -737,24 +762,41 @@ if __name__ == "__main__":
                         sys.exit()
 
                     elif event.type == pygame.MOUSEBUTTONDOWN:
-                        if event.button == 3:
-                            if placeable_troops > 0:
-                                current_world.add(MOUSE_WORLD_POS, new_ally_troop())
-                                placeable_troops -= 1
+                        if event.button == 1:
 
-                        elif event.button == 1:
-                            if MOUSE_POS.x < 55 and MOUSE_POS.y < 60:
+                            if get_selected_item() == placeable_troop and player.health > 0:
+                                current_world.add(MOUSE_WORLD_POS, new_troop())
+                                placeable_troop.deplete()
+
+                            if MOUSE_POS.x > window.get_width() - 65 and MOUSE_POS.y < 60:
                                 Globals.sound_on = not Globals.sound_on
                                 if Globals.sound_on:
                                     current_world.start_music()
                                 else:
                                     pygame.mixer.music.pause()
 
+                    elif event.type == pygame.MOUSEWHEEL:
+                        if get_selected_item().amount < 0 or get_selected_item() is not standard_gun:
+                            if event.y > 0:
+                                selected_index += 1
+                            if event.y < 0:
+                                selected_index -= 1
+
+                            if selected_index > len(current_items) - 1:
+                                selected_index = 0
+
+                            if selected_index < 0:
+                                selected_index = len(current_items) - 1
+
                     elif event.type == pygame.KEYDOWN:
-                        debug(event.key, MOUSE_WORLD_POS)
+                        if Globals.debug_mode:
+                            cheats(event.key, MOUSE_WORLD_POS)
+                        if event.key == pygame.K_v:
+                            Globals.debug_mode = not Globals.debug_mode
+                        if event.key == pygame.K_c:
+                            Globals.show_overlay = not Globals.show_overlay
                         if event.key == pygame.K_ESCAPE:
                             paused = True
-
                         if event.key == pygame.K_SPACE:
                             interact = True
                         if event.key == pygame.K_r:
@@ -774,42 +816,40 @@ if __name__ == "__main__":
                         paused = True
 
 
-
                 if player.health > 0 and MOUSE_BUTTONS[0]:  # Get if right click is held
-                    powerups[invis] = 0
-                    standard_gun = True
+                    selected_item = get_selected_item()
 
-                    if powerups[shotgun] > 0:
-                        standard_gun = False
-                        if pygame.time.get_ticks() - last_shotgun_time > 400:
-                            shotgun_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                            deplete_powerup(shotgun, 750)  # Deplete powerups extra when they are used
-                            last_shotgun_time = pygame.time.get_ticks()
+                    if selected_item == standard_gun:
+                        if pygame.time.get_ticks() - last_shoot_time > 250:
+                            single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                            last_shoot_time = pygame.time.get_ticks()
 
-                    if powerups[arrows] > 0:
-                        standard_gun = False
-                        if pygame.time.get_ticks() - last_arrow_time > 250:
-                            arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                            deplete_powerup(arrows, 500)
-                            last_arrow_time = pygame.time.get_ticks()
+                    elif selected_item.amount > 0:
 
-                    if powerups[grenade] > 0:
-                        standard_gun = False
-                        if pygame.time.get_ticks() - last_grenade_time > 400:
-                            grenade_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                            deplete_powerup(grenade, 1000)
-                            last_grenade_time = pygame.time.get_ticks()
+                        if selected_item == shotgun:
+                            if pygame.time.get_ticks() - last_shotgun_time > 400:
+                                shotgun_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                                shotgun.deplete()
+                                last_shotgun_time = pygame.time.get_ticks()
 
-                    if powerups[freeze_ray] > 0:
-                        standard_gun = False
-                        if pygame.time.get_ticks() - last_freeze_ray_time > 400:
-                            freeze_ray_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                            deplete_powerup(freeze_ray, 1000)
-                            last_freeze_ray_time = pygame.time.get_ticks()
+                        elif selected_item == arrows:
+                            if pygame.time.get_ticks() - last_arrow_time > 250:
+                                arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                                arrows.deplete()
+                                last_arrow_time = pygame.time.get_ticks()
 
-                    if standard_gun and pygame.time.get_ticks() - last_shoot_time > 250:
-                        single_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
-                        last_shoot_time = pygame.time.get_ticks()
+                        elif selected_item == grenade:
+                            if pygame.time.get_ticks() - last_grenade_time > 400:
+                                grenade_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                                grenade.deplete()
+                                last_grenade_time = pygame.time.get_ticks()
+
+                        elif selected_item == freeze_ray:
+                            if pygame.time.get_ticks() - last_freeze_ray_time > 400:
+                                freeze_ray_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
+                                freeze_ray.deplete()
+                                last_freeze_ray_time = pygame.time.get_ticks()
+
 
                 if current_world.complete_condition is not None and not current_world.completed:
                     if current_world.complete_condition(current_world):
@@ -840,42 +880,7 @@ if __name__ == "__main__":
                             spawn_explosion(dungeon, dungeon.world, team=player)
                             current_world.dungeons_defeated += 1
 
-                # Automatically deplete powerups as time goes on
-                deplete_powerup(shotgun, Globals.delta_time)
-                deplete_powerup(grenade, Globals.delta_time)
-                deplete_powerup(arrows, Globals.delta_time)
-                deplete_powerup(freeze_ray, Globals.delta_time)
-                deplete_powerup(metalsuit, Globals.delta_time)
-                deplete_powerup(invis, Globals.delta_time)
-                deplete_powerup(speed_shoes, Globals.delta_time)
-
-                # Speed up with speed shoes but slow down with metalsuit
-                if powerups[speed_shoes] > 0:
-                    if powerups[metalsuit] > 0:
-                        player.speed = player_speed * 1.25
-                    else:
-                        player.speed = player_speed * 1.4
-                else:
-                    if powerups[metalsuit] > 0:
-                        player.speed = player_speed * 0.8
-                    else:
-                        player.speed = player_speed
-
-                if powerups[invis] > 0:
-                    player.set_image(assets.IMG_PLAYER_INVIS)
-                elif powerups[metalsuit] > 0:
-                    player.set_image(assets.IMG_PLAYER_METALSUIT)
-                    player.invincible = True
-                    player.take_knockback = False
-                else:
-                    player.invincible = False
-                    player.take_knockback = True
-
-                if powerups[metalsuit] <= 0 and powerups[invis] <= 0:
-                    if player.current_image is not assets.IMG_PLAYER_OW and player.current_image is not assets.IMG_PLAYER_DEAD:
-                        player.set_image(assets.IMG_PLAYER_ALIVE)
-
-                player.control(keys_pressed)
+                player.control(KEYS_PRESSED)
 
                 for s in current_world.spawners:
                     s.update(current_world)
@@ -890,7 +895,6 @@ if __name__ == "__main__":
                             e.last_collisions.add(other)
                         else:
                             e.last_collisions.discard(other)
-
                     if not e.alive:
                         current_world.remove(e)
 
@@ -907,16 +911,13 @@ if __name__ == "__main__":
 
                 current_world.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
                 for e in current_world.entities:
-                    e.render(window, overlay, screen_pos(Vec(e.hitbox().center)))
-
+                    if player.pos.dist(e.pos) < 2000:
+                        e.render(window, overlay, screen_pos(Vec(e.hitbox().center)))
 
                 # Render overlay layer
                 if Globals.show_overlay:
                     stats = [
-                        #"Troops To Place: " + str(placeable_troops) + "/" + str(placeable_troops + len(current_world.allies)) + " (Right click)",
-                        "Existing Troops: " + str(len(current_world.allies)),
-                        "Placeable Troops: " + str(placeable_troops) + "  (Right click)",
-                        #"Position: " + str(player.pos.rounded()),
+                        "Troops: " + str(len(current_world.allies)),
                         "World: " + current_world.name,
                         "Damage: x " + str(round(player.damage_multiplier, 1)),
                         "Health: " + str(max(0, math.floor(player.health))) + "/" + str(max(0, round(player.max_health))),
@@ -924,10 +925,11 @@ if __name__ == "__main__":
 
                     if Globals.debug_mode:
                         stats.append("# Entities: " + str(len(current_world.entities)))
+                        stats.append("Position: " + str(player.pos.rounded()))
                         stats.append("FPS: " + str(round(clock.get_fps(), 1)))
                         stats.append("Time: " + str(current_world.time_elapsed/1000))
 
-                    util.draw_bar(overlay, Vec(114, Globals.SIZE.y - 35 * 5 - 6), Vec(200, 33),
+                    util.draw_bar(overlay, Vec(114, Globals.SIZE.y - 35 * 4 - 6), Vec(200, 33),
                                   player.health / player.max_health, (80, 130, 255), (0, 0, 0), center=False)
 
                     stat_y = Globals.SIZE.y - 15  # - 35
@@ -940,25 +942,31 @@ if __name__ == "__main__":
                                    center=True)
                     x = 0
                     y = 0
-                    for powerup in powerups:
-                        if powerups[powerup] > 0:
-                            image_size =  powerup.image.get_width()/2
-                            image_pos = Vec(Globals.SIZE.x - 95 + image_size/2, 5 + image_size/2) + (Vec(-x * 80, y * 110))
-                            overlay.blit(powerup.image, image_pos.tuple())
-                            timer_value = min(powerups[powerup] / powerup.current_max, 1)
-                            util.draw_bar(overlay, image_pos + Vec(35, 85), Vec(50, 6), timer_value, (255, 255, 255),
-                                          (100, 100, 100), center=True)
+                    for item in current_items:
+                        if item.amount > 0 or item == standard_gun:
+                            image_size = item.image.get_width()/2
+                            image_pos = Vec(300 + image_size/2, 5 + image_size/2) + (Vec(x*80 - 300, y*110))
+
+                            if get_selected_item() == item:
+                                pygame.draw.rect(overlay, (255, 255, 255, 100), pygame.Rect(image_pos.tuple(), item.image.get_size()))
+                                pygame.draw.rect(overlay, (0, 0, 0), pygame.Rect(image_pos.tuple(), item.image.get_size()), 3)
+
+                            overlay.blit(item.image, image_pos.tuple())
+
+                            amount_text = item.amount
+                            if item == standard_gun:
+                                amount_text = ""
+
+                            util.write(overlay, str(amount_text), assets.MAIN_FONT, 25, image_pos + Vec(35, 85),
+                                       (255, 255, 255), center=True)
                             x += 1
-                            if x >= 3:
-                                x = 0
-                                y += 1
 
                     sound_icon = None
                     if Globals.sound_on:
                        sound_icon = assets.IMG_SOUND_ON
                     else:
                        sound_icon = assets.IMG_SOUND_OFF
-                    overlay.blit(sound_icon, (0, 0))
+                    overlay.blit(sound_icon, (window.get_width() - 60, 0))
 
                 draw_cursor(overlay)
 

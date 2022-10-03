@@ -94,10 +94,10 @@ class Entity:
 
         # Keep track of shaking and shake the image if needed
         if self.shake_timer > 0 and not isinstance(self, Projectile):
-            dist = 3
+            shake_dist = 2
             if True:  # not self.is_player:
-                render_rect.x += random.randint(-dist, dist)
-                render_rect.y += random.randint(-dist, dist)
+                render_rect.x += random.randint(-shake_dist, shake_dist)
+                render_rect.y += random.randint(-shake_dist, shake_dist)
             self.shake_timer -= Globals.delta_time
 
         if self.animate:
@@ -227,7 +227,7 @@ class Portal(Entity):
 
     def render(self, surface, overlay_surface, pos):
         super().render(surface, overlay_surface, pos)
-        if self.touching_player:
+        if self.touching_player and Globals.show_overlay:
             util.write(overlay_surface, self.hover_message, assets.MAIN_FONT, 45,(Globals.SIZE/2) + Vec(0, 100),
                        (255, 255, 255), center=True)
 
@@ -338,7 +338,7 @@ class AIEntity(Entity):
                 if self.colliding(target):
                     target.hurt(self.damage, world)
                     if target.take_knockback:
-                        target.accel((target.pos - self.pos) * 0.05)
+                        target.accel((target.pos - self.pos) * 0.005)
                         # pygame.mixer.Sound.play(assets.random_hit_sfx())
                     assets.play_sound(assets.random_hit_sfx(), self.pos, player.pos)
                     self.atk_timer = 0
@@ -444,14 +444,14 @@ class Projectile(Entity):
                     other.hurt(damage, world)
 
                 if other.take_knockback:
-                    other.accel((other.pos - self.pos) * 0.05)
+                    other.accel(self.vel.norm() * 1)
                 if self.blockable:
                     if self.death_func is not None:
                         self.death_func(self, world, self.team)
                     self.alive = False
 
 
-class Item(Entity):
+class ItemEntity(Entity):
     def __init__(self, name, image, image_scale, collide_func, condition=None):
         super().__init__(name, image, image_scale)
         self.collide_func = collide_func # Callback function to run when the player collides

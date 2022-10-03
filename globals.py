@@ -2,7 +2,7 @@ from vector import Vec
 
 
 class Globals:
-    SIZE = Vec(1450, 950)
+    SIZE = Vec(1400, 925)
     delta_time = 0
     cursor_img = None
 

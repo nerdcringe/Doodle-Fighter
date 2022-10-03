@@ -11,9 +11,8 @@ class World:
     def __init__(self, name, size, outer_color, inner_color=None, dark=False, solid_border=False, image=None, music=None, complete_condition=None):
         self.name = name
         self.size = size
-        self.bg_surface = pygame.Surface(size.tuple(), pygame.SRCALPHA, 32)
+        self.bg_surface = pygame.Surface(size.tuple(), pygame.SRCALPHA, 32).convert()
         self.border = Vec(250, 250)
-        #self.fg_surface = pygame.Surface((size + self.border).tuple(), pygame.SRCALPHA, 32)
         self.outer_color, = outer_color,
         self.inner_color, = inner_color,
         self.dark = dark
@@ -55,7 +54,6 @@ class World:
 
     def render(self, surface, pos):
         surface.blit(self.bg_surface, pos.tuple())
-        #surface.blit(self.fg_surface, pos.tuple())
 
     def add(self, pos, e):
         self.entities.append(e)
