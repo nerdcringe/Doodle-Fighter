@@ -415,7 +415,7 @@ class Projectile(Entity):
                      or y <= h/2 - 100 or y >= world.size.y - h/2)
 
         if (self.distance > self.range or hits_border) and self.time > 50:
-            if self.death_func is not None:
+            if self.death_func is not None and self.alive:
                 self.death_func(self, world, self.team)
             self.alive = False
 

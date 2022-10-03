@@ -60,7 +60,6 @@ SFX_FREEZE = load_sfx("freeze.wav", 0.1)
 SFX_COLLECT = load_sfx("collect.wav", 0.4)
 SFX_BUFF = load_sfx("buff.wav", 0.8)
 SFX_EAT = load_sfx("eat.wav", 1)
-
 SFX_OW_PLAYER = load_sfx("ow_player.wav", 0.8)
 
 def random_hit_sfx():
@@ -134,6 +133,7 @@ IMG_PROJECTILE_BULLET = load_image("projectile_bullet.png")
 IMG_PROJECTILE_ARROW = load_image("projectile_arrow.png")
 IMG_PROJECTILE_SNOWFLAKE = load_image("projectile_snowflake.png")
 IMG_POOF = load_image("poof.png")
+IMG_BLOOD = load_image("blood.png")
 IMG_EXPLOSION = load_image("explosion.png")
 IMG_FROZEN_CLOUD = load_image("frozen_cloud.png")
 IMG_ICE_CUBE = load_image("ice_cube.png")

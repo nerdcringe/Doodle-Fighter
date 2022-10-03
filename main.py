@@ -139,7 +139,7 @@ def new_zoomer_boss():
 
 def new_troop():
     return RangedAIEntity("Troop", assets.IMG_TROOP, 0.275, 0.4, ALLY, health=8, damage=player.damage_multiplier, sight_range=600, follow_weight=0.05,
-                          atk_interval=1500, retreat_range=350, weapon_func=single_shot, hitbox_size=Vec(64, 64))
+                          atk_interval=1500, retreat_range=350, weapon_func=single_shot, hitbox_size=Vec(64, 64), death_func=spawn_blood)
 
 
 def new_apple_item():
@@ -222,7 +222,7 @@ def spawn_grave(self, world, team):
 
 def spawn_explosion(self, world, team):
     assets.play_sound(assets.SFX_BOOM, self.pos, player.pos)
-    explosion = Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.3, team, None, 2, self.vel, 1000, blockable=False, rotate=False)
+    explosion = Projectile("Explosion", assets.IMG_EXPLOSION, 0.45, 0.003, team, None, 2, self.vel, 1000, blockable=False, rotate=False)
     explosion.lifetime = 200
     world.add(self.pos, explosion)
 
@@ -242,7 +242,13 @@ def spawn_poof(self, world, team):
     poof.lifetime = 100
     poof.rotate(random.randint(0, 360))
     world.add(self.pos, poof)
-    #world.add(self.pos, Projectile("Poof", assets.IMG_POOF, 0.25, 0.75, NEUTRAL, None, 0, self.vel, 20, blockable=False, parent=self, rotate=False))
+
+def spawn_blood(self, world, team):
+    for i in range(4):
+        direction = Vec.polar(1, (i * 90) + random.randint(30, 60))
+        blood = Projectile("Poof", assets.IMG_BLOOD, 0.2, 0.65, NEUTRAL, None, 0, direction, 50, blockable=False, parent=self, rotate=True)
+        world.add(self.pos, blood)
+
 
 
 def drop_item(pos, item, world):
@@ -254,6 +260,7 @@ def tree_loot(self, world, team):
     drop_item(self.pos, new_apple_item(), world)
 
 def brawler_loot(self, world, team):
+    spawn_blood(self, world, team)
     if random.random() < 0.25:
         loot = random.choice((new_shotgun_item, new_speed_item))
         drop_item(self.pos, loot(), world)
@@ -261,6 +268,7 @@ def brawler_loot(self, world, team):
         drop_item(self.pos, new_troops_item(), world)
 
 def ranger_loot(self, world, team):
+    spawn_blood(self, world, team)
     if random.random() < 0.25:
         loot = random.choice((new_arrows_item, new_invis_item, new_apple_item))
         drop_item(self.pos, loot(), world)
@@ -268,6 +276,7 @@ def ranger_loot(self, world, team):
         drop_item(self.pos, new_troops_item(), world)
 
 def boomer_loot(self, world, team):
+    spawn_blood(self, world, team)
     spawn_explosion(self, world, team)
     if random.random() < 0.2:
         loot = random.choice((new_grenade_item,))
@@ -292,24 +301,29 @@ def car_loot(self, world, team):
         drop_item(self.pos, new_troops_item(), world)
 
 def brawler_boss_loot(self, world, team):
+    spawn_blood(self, world, team)
     loot = random.choice((new_shield_item, new_dmg_up_item))
     drop_item(self.pos, loot(), world)
 
 def ranger_boss_loot(self, world, team):
+    spawn_blood(self, world, team)
     drop_item(self.pos, new_apple_item(), world)
     drop_item(self.pos, random.choice((new_shield_item, new_dmg_up_item, new_invis_item))(), world)
 
 def cooler_loot(self, world, team):
+    spawn_frozen_cloud(self, world, team)
     if random.random() < 0.5:
         drop_item(self.pos, new_freeze_ray_item(), world)
     if random.random() < 0.1:
         drop_item(self.pos, new_troops_item(), world)
 
 def freezer_loot(self, world, team):
+    spawn_explosion(self, world, team)
     drop_item(self.pos, new_freeze_ray_item(), world)
     drop_item(self.pos, new_metalsuit_item(), world)
 
 def yeti_loot(self, world, team):
+    spawn_blood(self, world, team)
     loot = random.choice((new_shield_item, new_dmg_up_item))
     drop_item(self.pos, loot(), world)
     drop_item(self.pos, new_freeze_ray_item(), world)
@@ -653,7 +667,7 @@ if __name__ == "__main__":
         for i in range(5):
             size = Vec(random.randint(800, 1000), random.randint(800, 1000))
             entrance = Portal("House", assets.IMG_HOUSE, 0.9, hitbox_size=Vec(160, 220), solid=True, hover_message="Enter? (SPACE)")
-            house_world = World("House world #" + str(i), size, (100, 55, 36), (185, 153, 110), solid_border=True)
+            house_world = World("House #" + str(i), size, (100, 55, 36), (185, 153, 110), solid_border=True)
             enemy_sets = ((4, new_brawler), (3, new_ranger), (1, new_brawler_boss))
             overworld.add_dungeon(overworld.rand_pos(), new_dungeon(entrance, house_world, enemy_sets))
 
@@ -671,7 +685,7 @@ if __name__ == "__main__":
         for i in range(5):
             entrance = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(150, 185), solid=True, hover_message="Enter? (SPACE)")
             size = Vec(random.randint(700, 900), random.randint(700, 900))
-            office_world = World("Office world #" + str(i), size, (91, 108, 120), (191, 180, 147), solid_border=True)
+            office_world = World("Office #" + str(i), size, (91, 108, 120), (191, 180, 147), solid_border=True)
             enemy_sets = ((4, new_brawler), (3, new_ranger), (2, new_boomer), (1, new_brawler_boss), (1, new_zoomer))
             city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world, enemy_sets))
 
@@ -833,7 +847,7 @@ if __name__ == "__main__":
                                 last_shotgun_time = pygame.time.get_ticks()
 
                         elif selected_item == arrows:
-                            if pygame.time.get_ticks() - last_arrow_time > 250:
+                            if pygame.time.get_ticks() - last_arrow_time > 200:
                                 arrow_shot(current_world, player, ALLY, MOUSE_WORLD_POS - player.pos)
                                 arrows.deplete()
                                 last_arrow_time = pygame.time.get_ticks()
