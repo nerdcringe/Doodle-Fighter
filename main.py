@@ -58,65 +58,68 @@ def new_umbrella():
     return Entity("Umbrella", assets.IMG_UMBRELLA, 0.675, solid=True, hitbox_size=Vec(10, 135))
 
 
-def new_dungeon(entrance, dungeon_world, enemy_sets):
+def new_dungeon(entrance, dungeon_world, enemy_type, amount):
     door = Portal("Door", assets.IMG_DOOR, 0.8, to_entity=entrance, hover_message="Exit? (SPACE)") # Exiting the door sends player outside the dungeon
     dungeon_world.add(Vec(dungeon_world.size.x/2, -60), door)
     entrance.to_entity = door  # Set dungeon destination to the door inside the dungeon
 
-    chosen_set = random.choice(enemy_sets)
-
-    for i in range(chosen_set[0]): # 0 index is amount to spawn
+    for i in range(amount): # 0 index is amount to spawn
         spawn_pos = Vec(dungeon_world.size.x * 0.5, dungeon_world.size.y * 0.75)
         spawn_pos += Vec.polar(random.randint(50, 250), random.randint(0, 360))
-        dungeon_world.add(spawn_pos, chosen_set[1]())  # 1 index is the type of enemy
+        dungeon_world.add(spawn_pos, enemy_type())  # 1 index is the type of enemy
 
     return entrance
 
 
 def new_brawler():
-    return AIEntity("Brawler", assets.IMG_BRAWLER, 0.3, 0.5, ENEMY, 6, 1, sight_range=600, follow_weight=0.1,
+    sprite = assets.IMG_BRAWLER
+    if current_world == frostland or current_world in frostland.dungeons:
+        sprite = assets.IMG_BRAWLER # change appearance of brawler in frostland
+
+    return AIEntity("Brawler", sprite, 0.3, 0.5, ENEMY, 5, 1, sight_range=500, follow_weight=0.1,
                     atk_interval=750, retreat_range=175, death_func=brawler_loot)
 
-def new_cold_brawler():
-    return AIEntity("Brawler", assets.IMG_BRAWLER_COLD, 0.3, 0.5, ENEMY, 6, 1, 600, 0.1, 750, 175, death_func=brawler_loot)
-
 def new_brawler_boss():
-    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.5, 0.65, ENEMY, 25, 3, 1500, 0.035, 1000, 225,
-                    hitbox_size=Vec(128, 128), death_func=brawler_boss_loot)
+    boss = AIEntity("Brawler Boss", assets.IMG_BRAWLER_BOSS, 0.45, 0.65, ENEMY, 25, 3, 1200, 0.035, 1000, 225,
+                    hitbox_size=Vec(120, 120), death_func=brawler_boss_loot)
     boss.take_knockback = False
     return boss
 
 def new_ranger():
-    return RangedAIEntity("Ranger", assets.IMG_RANGER, 0.25, speed=0.4, team=ENEMY, health=3, damage=1, sight_range=700,
+    return RangedAIEntity("Ranger", assets.IMG_RANGER, 0.25, speed=0.4, team=ENEMY, health=3, damage=1, sight_range=600,
                           follow_weight=0.08, atk_interval=2000, retreat_range=350, weapon_func=arrow_shot,
                           death_func=ranger_loot, hitbox_size=Vec(64, 64))
 
 def new_ranger_boss():
-    return RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, speed=0.5, team=ENEMY, health=20, damage=1, sight_range=800,
-                          follow_weight=0.05, atk_interval=1000, retreat_range=350, weapon_func=arrow_shot,
+    boss = RangedAIEntity("Ranger Boss", assets.IMG_RANGER_BOSS, 0.4, speed=0.5, team=ENEMY, health=20, damage=1, sight_range=700,
+                          follow_weight=0.05, atk_interval=1250, retreat_range=350, weapon_func=arrow_shot,
                           death_func=ranger_boss_loot, hitbox_size=Vec(100, 100))
+    boss.take_knockback = False
+    return boss
+
 
 def new_boomer():
-    return RangedAIEntity("Boomer", assets.IMG_BOOMER, 0.3, 0.25, ENEMY, 8, 1, 400, 0.05, 3000, 250,
+    return RangedAIEntity("Boomer", assets.IMG_BOOMER, 0.3, 0.25, ENEMY, 10, 1, 400, 0.05, 3000, 250,
                           weapon_func=grenade_shot, death_func=boomer_loot, hitbox_size=Vec(70, 70))
 
 def new_zoomer():
-    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.55, team=ENEMY, health=6, damage=2, sight_range=300,
+    return RangedAIEntity("Zoomer", assets.IMG_ZOOMER, 0.3, speed=0.55, team=ENEMY, health=12, damage=2, sight_range=300,
                           follow_weight=0.05, atk_interval=300, retreat_range=200,
                           weapon_func=single_shot, death_func=zoomer_loot, hitbox_size=Vec(70, 70))
 
 def new_car():
-    car = AIEntity("Car", assets.IMG_CAR_FRONT, 0.5, 0.5, ENEMY, health=12, damage=2, sight_range=300, follow_weight=0.1,
-                    atk_interval=5000, retreat_range=400, death_func=car_loot, hitbox_size=Vec(110, 80))
+    car = AIEntity("Car", assets.IMG_CAR_FRONT, 0.6, 0.5, ENEMY, health=16, damage=2, sight_range=300, follow_weight=0.05,
+                    atk_interval=5000, retreat_range=400, death_func=car_loot, hitbox_size=Vec(130, 90))
 
     car.right_image = assets.IMG_CAR_SIDE
     car.left_image = pygame.transform.flip(car.right_image, True, False)
+    car.take_knockback = False
     return car
 
 def new_cooler():
-    return RangedAIEntity("Cooler", assets.IMG_COOLER, 0.4, speed=0.45, team=ENEMY, health=8, damage=1, sight_range=600,
+    return RangedAIEntity("Cooler", assets.IMG_COOLER, 0.4, speed=0.45, team=ENEMY, health=16, damage=1, sight_range=600,
                           follow_weight=0.05, atk_interval=4500, retreat_range=250, weapon_func=freeze_ray_shot,
-                          death_func=cooler_loot, hitbox_size=Vec(80, 80))
+                          death_func=cooler_loot, hitbox_size=Vec(90, 86))
 
 def new_freezer():
     return RangedAIEntity("Freezer", assets.IMG_FREEZER, 0.7, speed=0.5, team=ENEMY, health=50, damage=1, sight_range=600,
@@ -153,16 +156,16 @@ def new_shield_item():
 
 
 def new_shotgun_item():
-    return ItemEntity("Shotgun", assets.IMG_SHOTGUN, 0.25, lambda: shotgun.gain(8))
+    return ItemEntity("Shotgun", assets.IMG_SHOTGUN, 0.25, lambda: shotgun.gain(5))
 
 def new_arrows_item():
-    return ItemEntity("Arrows", assets.IMG_ARROWS, 0.25, lambda: arrows.gain(8))
+    return ItemEntity("Arrows", assets.IMG_ARROWS, 0.25, lambda: arrows.gain(5))
 
 def new_grenade_item():
-    return ItemEntity("Grenade", assets.IMG_GRENADE, 0.25, lambda: grenade.gain(6))
+    return ItemEntity("Grenade", assets.IMG_GRENADE, 0.25, lambda: grenade.gain(5))
 
 def new_freeze_ray_item():
-    return ItemEntity("Freeze Ray", assets.IMG_FREEZE_RAY, 0.25, lambda: freeze_ray.gain(8))
+    return ItemEntity("Freeze Ray", assets.IMG_FREEZE_RAY, 0.25, lambda: freeze_ray.gain(5))
 
 def new_speed_item():
     return ItemEntity("Speed Shoes", assets.IMG_SPEED_SHOES, 0.25, lambda: player.raise_effect_time("speed", 8000))
@@ -181,7 +184,7 @@ def new_bullet(parent, team, direction, Range):
     image_scale = 0.8
     if parent is player:
         image_scale += (0.1 * player.damage_multiplier)
-    return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, image_scale, 1.25, team, None, 1, direction, Range, parent=parent,
+    return Projectile("Bullet", assets.IMG_PROJECTILE_BULLET, image_scale, 1.15, team, None, 1, direction, Range, parent=parent,
                       death_func=spawn_poof, blockable=True)
 
 def single_shot(world, parent, team, direction):
@@ -201,7 +204,7 @@ def shotgun_shot(world, parent, team, direction):
 
 def arrow_shot(world, parent, team, direction):
     assets.play_sound(assets.SFX_SHOOT_ARROW, parent.pos, player.pos)
-    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.8, team, None, 2, direction, 750, parent=parent,
+    arrow = Projectile("Arrow", assets.IMG_PROJECTILE_ARROW, 0.75, 1.5, team, None, 2, direction, 750, parent=parent,
                        death_func=spawn_poof, blockable=False, hitbox_size=Vec(36, 36))
     world.add(parent.pos, arrow)
 
@@ -286,10 +289,10 @@ def boomer_loot(self, world, team):
 
 def zoomer_loot(self, world, team):
     spawn_explosion(self, world, team)
-    if random.random() < 0.15:
-        loot = random.choice((new_metalsuit_item, new_shield_item))
-        drop_item(self.pos, loot(), world)
     drop_item(self.pos, new_speed_item(), world)
+    if random.random() < 0.15:
+        loot = random.choice((new_metalsuit_item, new_shield_item, new_shotgun_item))
+        drop_item(self.pos, loot(), world)
     if random.random() < 0.3:
         drop_item(self.pos, new_troops_item(), world)
 
@@ -357,6 +360,7 @@ class Player(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, death_func=None, hurt_func=None):
         super().__init__(name, image, image_scale, team, health, death_func=death_func)
         self.speed = speed
+        self.default_speed = speed
         self.hurt_func = hurt_func
         self.is_player = True
         self.damage_multiplier = 1
@@ -461,16 +465,16 @@ class Player(Entity):
         self.effects["metalsuit"] = max(self.effects["metalsuit"], 0)
         self.effects["invisible"] = max(self.effects["invisible"], 0)
 
-        if self.effects["speed"] > 0:
+        if self.effects["speed"] > 0: # no speed
             if self.effects["metalsuit"] > 0:
-                self.speed = player_speed * 1.3
+                self.speed = self.default_speed * 1.25
             else:
-                self.speed = player_speed * 1.75
-        else:
+                self.speed = self.default_speed * 1.6
+        else: # No speed
             if self.effects["metalsuit"] > 0:
-                self.speed = player_speed * 0.8
+                self.speed = self.default_speed * 0.8
             else:
-                self.speed = player_speed
+                self.speed = self.default_speed
 
         if self.effects["invisible"] > 0:
             self.set_image(assets.IMG_PLAYER_INVIS)
@@ -618,7 +622,7 @@ if __name__ == "__main__":
 
         worlds = []
 
-        overworld = World("Overworld", Vec(2500, 2500), (220, 200, 140), (85, 175, 95), music=assets.MUSIC_OVERWORLD)
+        overworld = World("Overworld", Vec(2750, 2750), (220, 200, 140), (85, 175, 95), music=assets.MUSIC_OVERWORLD)
         worlds.append(overworld)
 
         city = World("City", Vec(3000, 3000), (100, 200, 150), (175, 175, 175), music=assets.MUSIC_RAIN)
@@ -632,7 +636,8 @@ if __name__ == "__main__":
                        complete_condition=lambda w: w.time_elapsed > 60000)
         worlds.append(forest)
 
-        beach = World("Beach", Vec(3000, 1500), (45, 149, 180), (195, 179, 94), music=assets.MUSIC_BEACH)
+        beach = World("Beach", Vec(3500, 2500), (45, 149, 180), (195, 179, 94), music=assets.MUSIC_BEACH,
+                      complete_condition=lambda w: w.time_elapsed > 90000)
         worlds.append(beach)
 
         caveworld = World("Cave", Vec(1500, 1600), (10, 10, 10), (40, 40, 40), dark=True, solid_border=True,
@@ -644,10 +649,7 @@ if __name__ == "__main__":
 
         current_world = overworld
         current_world.start_music()
-
-
-        player_speed = 0.7
-        player = Player("Player", assets.IMG_PLAYER_ALIVE, 0.28, player_speed, ALLY, 20, death_func=spawn_grave)
+        player = Player("Player", assets.IMG_PLAYER_ALIVE, 0.28, 0.7, ALLY, 20, death_func=spawn_grave)
         overworld.add(overworld.size/2, player)
 
 
@@ -655,92 +657,96 @@ if __name__ == "__main__":
                                hover_message="Enter? (SPACE)")
         overworld.add(Vec(2000, 2000), cave_entrance)
 
-        for i in range(8):
+        for i in range(6):
             overworld.add(overworld.rand_pos(), new_rock())
-
-        overworld.add_spawner(Spawner(8000, new_tree, max_num=10, center_spread=1.25, pre_spawned=10))
-        overworld.add_spawner(Spawner(8000, new_brawler, max_num=6, max_spawn=2))
-        overworld.add_spawner(Spawner(10000, new_ranger, max_num=3, max_spawn=1))
-        #overworld.add_spawner(Spawner(10000, new_ranger, max_num=3))
-        overworld.add_spawner(Spawner(45000, new_brawler_boss, max_num=1))
+        for i in range(12):
+            overworld.add(overworld.rand_pos(), new_tree())
+        overworld.add_spawner(Spawner(8000, new_brawler, spawn_limit=6, spawn_amount=2))
+        overworld.add_spawner(Spawner(12000, new_ranger, spawn_limit=4, spawn_amount=2))
+        overworld.add_spawner(Spawner(45000, new_brawler_boss, spawn_limit=1, destination=cave_entrance.pos + Vec(0, 30)))
 
         for i in range(5):
-            size = Vec(random.randint(800, 1000), random.randint(800, 1000))
+            size = Vec(random.randint(900, 1000), random.randint(900, 1000))
             entrance = Portal("House", assets.IMG_HOUSE, 0.9, hitbox_size=Vec(160, 220), solid=True, hover_message="Enter? (SPACE)")
             house_world = World("House #" + str(i), size, (100, 55, 36), (185, 153, 110), solid_border=True)
-            enemy_sets = ((4, new_brawler), (3, new_ranger), (1, new_brawler_boss))
-            overworld.add_dungeon(overworld.rand_pos(), new_dungeon(entrance, house_world, enemy_sets))
+
+            enemy_sets = ((new_brawler, 4), (new_brawler, 4), (new_ranger, 3), (new_ranger, 3), (new_brawler_boss, 1))
+            enemy = enemy_sets[i][0]
+            amount = enemy_sets[i][1]
+
+            overworld.add_dungeon(overworld.rand_pos(), new_dungeon(entrance, house_world, enemy, amount))
 
         cave_exit = Portal("Cave Exit", assets.IMG_CAVE_EXIT, 1.25, solid=False,
                            hover_message="Exit? (SPACE)", to_entity=cave_entrance)
         caveworld.add(Vec(750, -80), cave_exit)
-        # Reference cave entrances's destination to the cave exit because now the exit is defined
         cave_entrance.to_entity = cave_exit
 
-        caveworld.add_spawner(Spawner(2000, new_brawler_boss, max_num=4, pre_spawned=1))
+        caveworld.add_spawner(Spawner(2000, new_brawler_boss, spawn_limit=4))
 
 
         for i in range(8):
-            city.add(overworld.rand_pos(), new_street_light())
+            city.add(city.rand_pos(), new_city_tree())
+        for i in range(6):
+            city.add(city.rand_pos(), new_street_light())
         for i in range(5):
             entrance = Portal("Office", assets.IMG_OFFICE, 1, hitbox_size=Vec(150, 185), solid=True, hover_message="Enter? (SPACE)")
-            size = Vec(random.randint(700, 900), random.randint(700, 900))
+            size = Vec(random.randint(800, 900), random.randint(800, 900))
             office_world = World("Office #" + str(i), size, (91, 108, 120), (191, 180, 147), solid_border=True)
-            enemy_sets = ((4, new_brawler), (3, new_ranger), (2, new_boomer), (1, new_brawler_boss), (1, new_zoomer))
-            city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world, enemy_sets))
 
-        #city_world.add_spawner(Spawner(0, new_office, max_num=10, pre_spawned=10))
-        city.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=12))
-        city.add_spawner(Spawner(6000, new_car, max_num=3, pre_spawned=1))
-        city.add_spawner(Spawner(10000, new_brawler, max_num=4, max_spawn=2, pre_spawned=0))
-        city.add_spawner(Spawner(20000, new_boomer, max_num=1, max_spawn=1, pre_spawned=0))
-        city.add_spawner(Spawner(60000, new_brawler_boss, max_num=2, pre_spawned=0))
-        #city.add_spawner(Spawner(18000, new_zoomer, max_num=4, max_spawn=2, pre_spawned=0))
+            enemy_sets = ((new_brawler, 4),  (new_brawler, 4), (new_ranger, 3), (new_boomer, 2), (new_brawler_boss, 1), (new_brawler_boss, 1))
+            enemy = enemy_sets[i][0]
+            amount = enemy_sets[i][1]
+            city.add_dungeon(city.rand_pos(), new_dungeon(entrance, office_world, enemy, amount))
+
+        city.add_spawner(Spawner(8000, new_car, spawn_limit=3))
+        city.add_spawner(Spawner(10000, new_brawler, spawn_limit=4, spawn_amount=2))
+        city.add_spawner(Spawner(20000, new_boomer, spawn_limit=2))
+        city.add_spawner(Spawner(45000, new_brawler_boss, spawn_limit=2))
 
 
-        frostland.add_spawner(Spawner(6000, new_winter_tree, max_num=6, center_spread=2, pre_spawned=10))
-        frostland.add_spawner(Spawner(6000, new_cold_brawler, max_num=4, max_spawn=2))
-        frostland.add_spawner(Spawner(6000, new_cooler, max_num=4, max_spawn=1))
-        frostland.add_spawner(Spawner(20000, new_freezer, max_num=2, max_spawn=1))
-        frostland.add_spawner(Spawner(45000, new_yeti, max_num=1, max_spawn=1))
-
+        for i in range(12):
+            frostland.add(frostland.rand_pos(), new_winter_tree())
+        frostland.add_spawner(Spawner(6000, new_brawler, spawn_limit=6, spawn_amount=2))
+        frostland.add_spawner(Spawner(6000, new_cooler, spawn_limit=4))
+        frostland.add_spawner(Spawner(20000, new_freezer, spawn_limit=2))
+        frostland.add_spawner(Spawner(45000, new_yeti, spawn_limit=1))
 
         for i in range(5):
             entrance = Portal("Igloo", assets.IMG_IGLOO, 0.85, hitbox_size=Vec(185, 185), solid=True, hover_message="Enter? (SPACE)")
-            size = Vec(random.randint(600, 800), random.randint(600, 800))
+            size = Vec(random.randint(700, 800), random.randint(700, 800))
             igloo_world = World("Igloo #" + str(i), size, (200, 240, 250), (150, 210, 225), solid_border=True, music=assets.MUSIC_FIREPLACE)
             igloo_world.add(Vec(size.x/2, size.y+100), Entity("Fireplace", assets.IMG_FIREPLACE, 0.9, animate=True))
 
-            enemy_sets = ((6, new_cold_brawler), (4, new_ranger), (3, new_boomer), (2, new_yeti),
-                          (2, new_zoomer), (3, new_cooler), (1, new_freezer))
-            frostland.add_dungeon(frostland.rand_pos(), new_dungeon(entrance, igloo_world, enemy_sets))
+            enemy_sets = ((new_brawler, 6), (new_boomer, 3), (new_yeti, 2), (new_cooler, 3), (new_freezer, 1))
+            enemy = enemy_sets[i][0]
+            amount = enemy_sets[i][1]
+            frostland.add_dungeon(frostland.rand_pos(), new_dungeon(entrance, igloo_world, enemy, amount))
 
-
+        for i in range(16):
+            forest.add(forest.rand_pos(), new_winter_tree())
         for i in range(8):
             forest.add(forest.rand_pos(), new_rock())
-        forest.add_spawner(Spawner(7000, new_ranger, max_num=8, max_spawn=2, pre_spawned=2))
-        forest.add_spawner(Spawner(10000, new_ranger_boss, max_num=1, pre_spawned=0))
-        forest.add_spawner(Spawner(5000, new_winter_tree, max_num=16, pre_spawned=18))
+        forest.add_spawner(Spawner(7000, new_ranger, spawn_limit=8))
+        forest.add_spawner(Spawner(10000, new_ranger_boss, spawn_limit=1))
 
-
-        beach.add_spawner(Spawner(8000, new_zoomer, max_num=6, max_spawn=2, center_spread=100))
-        beach.add_spawner(Spawner(10000, new_cooler, max_num=3, max_spawn=1))
-        for i in range(5):
+        beach.add_spawner(Spawner(12000, new_zoomer, spawn_limit=6, spawn_amount=3))
+        beach.add_spawner(Spawner(10000, new_cooler, spawn_limit=3))
+        for i in range(4):
             beach.add(beach.rand_pos(), new_umbrella())
-
-        beach.add_spawner(Spawner(5000, new_palm_tree, max_num=8, pre_spawned=12))
+        for i in range(8):
+            beach.add(beach.rand_pos(), new_palm_tree())
         for i in range(5):
             beach.add(beach.rand_pos(), new_rock())
 
 
-        space_station.add_spawner(Spawner(0, new_city_tree, max_num=8, pre_spawned=8))
-        #space_station.add_spawner(Spawner(6000, new_brawler, max_num=4, max_spawn=2, pre_spawned=0))
-        space_station.add_spawner(Spawner(6000, new_boomer, max_num=4, max_spawn=2, pre_spawned=0))
-        space_station.add_spawner(Spawner(10000, new_zoomer, max_num=4, max_spawn=2, pre_spawned=0))
-        space_station.add_spawner(Spawner(10000, new_brawler_boss, max_num=3, max_spawn=1, pre_spawned=0))
-        space_station.add_spawner(Spawner(10000, new_ranger_boss, max_num=3, max_spawn=1, pre_spawned=0))
-        space_station.add_spawner(Spawner(30000, new_yeti, max_num=2, max_spawn=1, pre_spawned=0))
-        space_station.add_spawner(Spawner(30000, new_zoomer_boss, max_num=2, max_spawn=1, pre_spawned=0))
+        for i in range(8):
+            space_station.add(space_station.rand_pos(), new_city_tree())
+        space_station.add_spawner(Spawner(8000, new_boomer, spawn_limit=6, spawn_amount=2))
+        space_station.add_spawner(Spawner(10000, new_zoomer, spawn_limit=4, spawn_amount=2))
+        space_station.add_spawner(Spawner(10000, new_brawler_boss, spawn_limit=2))
+        space_station.add_spawner(Spawner(12000, new_ranger_boss, spawn_limit=2))
+        space_station.add_spawner(Spawner(30000, new_yeti, spawn_limit=2))
+        space_station.add_spawner(Spawner(40000, new_zoomer_boss, spawn_limit=2))
 
 
         while not restart:
@@ -807,8 +813,6 @@ if __name__ == "__main__":
                             cheats(event.key, MOUSE_WORLD_POS)
                         if event.key == pygame.K_v:
                             Globals.debug_mode = not Globals.debug_mode
-                        if event.key == pygame.K_c:
-                            Globals.show_overlay = not Globals.show_overlay
                         if event.key == pygame.K_ESCAPE:
                             paused = True
                         if event.key == pygame.K_SPACE:
@@ -924,63 +928,65 @@ if __name__ == "__main__":
                 current_world.render(window, blit_pos)
 
                 current_world.entities.sort(key = lambda e: e.pos.y + e.size.y/2)
+
+                window_rect = window.get_rect().inflate(200, 200)
                 for e in current_world.entities:
-                    if player.pos.dist(e.pos) < 2000:
-                        e.render(window, overlay, screen_pos(Vec(e.hitbox().center)))
+                    #if pygame.Rect.collidepoint(window_rect, render_pos.tuple()):  # Only render entities on screen
+
+                    e.render(window, overlay, screen_pos(e.pos))
 
                 # Render overlay layer
-                if Globals.show_overlay:
-                    stats = [
-                        "Troops: " + str(len(current_world.allies)),
-                        "World: " + current_world.name,
-                        "Damage: x " + str(round(player.damage_multiplier, 1)),
-                        "Health: " + str(max(0, math.floor(player.health))) + "/" + str(max(0, round(player.max_health))),
-                    ]
+                stats = [
+                    "Troops: " + str(len(current_world.allies)),
+                    "World: " + current_world.name,
+                    "Damage: x " + str(round(player.damage_multiplier, 1)),
+                    "Health: " + str(max(0, math.floor(player.health))) + "/" + str(max(0, round(player.max_health))),
+                ]
 
-                    if Globals.debug_mode:
-                        stats.append("# Entities: " + str(len(current_world.entities)))
-                        stats.append("Position: " + str(player.pos.rounded()))
-                        stats.append("FPS: " + str(round(clock.get_fps(), 1)))
-                        stats.append("Time: " + str(current_world.time_elapsed/1000))
+                if Globals.debug_mode:
+                    stats.append("# Entities: " + str(len(current_world.entities)))
+                    stats.append("Position: " + str(player.pos.rounded()))
+                    stats.append("FPS: " + str(round(clock.get_fps(), 1)))
+                    stats.append("Time: " + str(current_world.time_elapsed/1000))
 
-                    util.draw_bar(overlay, Vec(114, Globals.SIZE.y - 35 * 4 - 6), Vec(200, 33),
-                                  player.health / player.max_health, (80, 130, 255), (0, 0, 0), center=False)
+                util.draw_bar(overlay, Vec(114, Globals.SIZE.y - 35 * 4 - 6), Vec(200, 33),
+                              player.health / player.max_health, (80, 130, 255), (0, 0, 0), center=False)
 
-                    stat_y = Globals.SIZE.y - 15  # - 35
-                    for stat in stats:
-                        stat_y -= 35
-                        util.write(overlay, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
+                stat_y = Globals.SIZE.y - 15  # - 35
+                for stat in stats:
+                    stat_y -= 35
+                    util.write(overlay, stat, assets.MAIN_FONT, 34, Vec(10, stat_y), (255, 255, 255))
 
-                    if player.health <= 0:
-                        util.write(overlay, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE/2 + Vec(0, 100), (255, 255, 255),
-                                   center=True)
-                    x = 0
-                    y = 0
-                    for item in current_items:
-                        if item.amount > 0 or item == standard_gun:
-                            image_size = item.image.get_width()/2
-                            image_pos = Vec(300 + image_size/2, 5 + image_size/2) + (Vec(x*80 - 300, y*110))
+                if player.health <= 0:
+                    util.write(overlay, "Press R to restart", assets.MAIN_FONT, 45, Globals.SIZE/2 + Vec(0, 100), (255, 255, 255),
+                               center=True)
+                x = 0
+                y = 0
+                for item in current_items:
+                    if item.amount > 0 or item == standard_gun:
+                        image_size = item.image.get_width()/2
+                        image_pos = Vec(300 + image_size/2, 5 + image_size/2) + (Vec(x*80 - 300, y*110))
 
-                            if get_selected_item() == item:
-                                pygame.draw.rect(overlay, (255, 255, 255, 100), pygame.Rect(image_pos.tuple(), item.image.get_size()))
-                                pygame.draw.rect(overlay, (0, 0, 0), pygame.Rect(image_pos.tuple(), item.image.get_size()), 3)
+                        if get_selected_item() == item:
+                            pygame.draw.rect(overlay, (255, 255, 255, 100), pygame.Rect(image_pos.tuple(), item.image.get_size()))
+                            pygame.draw.rect(overlay, (0, 0, 0), pygame.Rect(image_pos.tuple(), item.image.get_size()), 3)
 
-                            overlay.blit(item.image, image_pos.tuple())
+                        overlay.blit(item.image, image_pos.tuple())
 
-                            amount_text = item.amount
-                            if item == standard_gun:
-                                amount_text = ""
+                        amount_text = item.amount
+                        if item == standard_gun:
+                            amount_text = ""
 
-                            util.write(overlay, str(amount_text), assets.MAIN_FONT, 25, image_pos + Vec(35, 85),
-                                       (255, 255, 255), center=True)
-                            x += 1
+                        util.write(overlay, str(amount_text), assets.MAIN_FONT, 25, image_pos + Vec(35, 85),
+                                   (255, 255, 255), center=True)
+                        x += 1
 
-                    sound_icon = None
-                    if Globals.sound_on:
-                       sound_icon = assets.IMG_SOUND_ON
-                    else:
-                       sound_icon = assets.IMG_SOUND_OFF
-                    overlay.blit(sound_icon, (window.get_width() - 60, 0))
+                sound_icon = None
+                if Globals.sound_on:
+                   sound_icon = assets.IMG_SOUND_ON
+                else:
+                   sound_icon = assets.IMG_SOUND_OFF
+                overlay.blit(sound_icon, (window.get_width() - 60, 0))
 
                 draw_cursor(overlay)
 

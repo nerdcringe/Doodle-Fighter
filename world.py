@@ -83,57 +83,42 @@ class World:
 
     def add_spawner(self, spawner):
         self.spawners.append(spawner)
-        spawner.init(self)
 
     def add_dungeon(self, pos, entrance):
         self.add(pos, entrance)
         self.dungeons.append(entrance)
-
 
     def rand_pos(self):
         return Vec(random.randint(0, self.size.x), random.randint(0, self.size.y))
 
 
 class Spawner:
-    def __init__(self, interval, spawn_func, max_num, dest=None, center_spread=1, pre_spawned=0, min_spawn=1, max_spawn=1):
+    def __init__(self, interval, spawn_func, spawn_limit=4, spawn_amount=1, destination=None, ):
         self.interval = interval
         self.spawn_func = spawn_func
-        self.max_num = max_num
-        self.dest = dest  # Specific position to spawn in world
-        self.radius = center_spread  # Multiplier for position (< 1 is towards center, > 1 is towards edges)
-        self.pre_spawned = pre_spawned  # How many to spawn at first
-        self.min_spawn = min_spawn  # Min number that can spawn at once
-        self.max_spawn = max_spawn  # Max number that can spawn at once
-
+        self.spawn_limit = spawn_limit      # Only spawns when there aren't too many already existing
+        self.spawn_amount = spawn_amount    # Number to spawn at once
+        self.destination = destination      # Specific position to spawn in world
         self.time = 0
         self.spawned = []
-
-    def init(self, world):
-        for i in range(self.pre_spawned):
-            self.spawn(world, world.rand_pos())
 
     def update(self, world):
         self.time += Globals.delta_time
         if self.time > self.interval:
-            if self.dest is None:  # If dest is none, random position in world
-                spawn_pos = world.rand_pos() * 1 # self.radiusspawn_pos -= world.size/2
-                spawn_pos -= world.size/2
-                spawn_pos *= self.radius
-                spawn_pos += world.size/2
-            else:
-                # Else destination is specific position in world
-                spawn_pos = self.dest
-
-            amount = random.randint(self.min_spawn, self.max_spawn)
-
-            for i in range(amount):
-                if len(self.spawned) < self.max_num:
-                    self.spawn(world, spawn_pos)
+            self.spawn(world)
             self.time = 0
 
-    def spawn(self, world, pos):
-        entity = self.spawn_func()
-        self.spawned.append(entity)
+    def spawn(self, world):
+        spawn_pos = Vec(0, 0)
+        if self.destination is None:  # If no destination specified, choose random position in world
+            spawn_pos = world.rand_pos()
+        else:
+            # Else destination is specific position in world
+            spawn_pos = self.destination
 
-        world.add(pos, entity)
-        entity.keep_in_bounds(world)
+        for i in range(self.spawn_amount):
+            if len(self.spawned) < self.spawn_limit:
+                entity = self.spawn_func()
+                self.spawned.append(entity)
+                world.add(spawn_pos, entity)
+                entity.keep_in_bounds(world)

@@ -84,7 +84,7 @@ class Entity:
         self.surface = pygame.transform.rotate(self.surface, angle)
 
     def render(self, surface, overlay_surface, pos):
-        hitbox = self.hitbox()
+        hitbox = self.get_hitbox()
         hitbox.center = pos.tuple()
 
         render_rect = hitbox.copy()
@@ -166,7 +166,7 @@ class Entity:
         self.pos.y = util.clamp(self.pos.y, -self.size.y/2 + 20, world.size.y - self.size.y/2)
 
     def colliding(self, other):
-        return self.hitbox().colliderect(other.hitbox())
+        return self.get_hitbox().colliderect(other.get_hitbox())
 
     def collide(self, other, world):
         if self.solid and not other.solid and not isinstance(other, Projectile):
@@ -181,7 +181,7 @@ class Entity:
     def accel(self, a):
         self.vel += a
 
-    def hitbox(self):
+    def get_hitbox(self):
         return util.rect_center(self.pos, self.size)
 
     def hurt(self, amount, world):
@@ -217,7 +217,7 @@ class Portal(Entity):
         if self.to_position is not None: # Go to position if specified
             return self.to_position
         elif self.to_entity is not None: # Go to entity's position if entity is specified
-            return Vec(self.to_entity.pos + Vec(0, self.to_entity.hitbox()[3]/2))
+            return Vec(self.to_entity.pos + Vec(0, self.to_entity.get_hitbox()[3] / 2))
         return None
 
     def destination_world(self):
@@ -227,14 +227,13 @@ class Portal(Entity):
 
     def render(self, surface, overlay_surface, pos):
         super().render(surface, overlay_surface, pos)
-        if self.touching_player and Globals.show_overlay:
+        if self.touching_player:
             util.write(overlay_surface, self.hover_message, assets.MAIN_FONT, 45,(Globals.SIZE/2) + Vec(0, 100),
                        (255, 255, 255), center=True)
 
     def update(self, world, player):
         super().update(world, player)
         self.touching_player = False
-
 
     def collide(self, other, world):
         super().collide(other, world)
@@ -245,7 +244,7 @@ class Portal(Entity):
 
 class AIEntity(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, sight_range, follow_weight, atk_interval, retreat_range,
-                 death_func=None, hitbox_size=None):
+                 death_func=None, hitbox_size=None, atk_sound=None):
         super().__init__(name, image, image_scale, team, health, solid=False, hitbox_size=hitbox_size, death_func=death_func)
         self.speed = speed
         self.damage = damage
@@ -255,10 +254,9 @@ class AIEntity(Entity):
         self.atk_timer = 0
         self.retreat_range = retreat_range  # how far to back up when recharging attack
         # different sprites for different direction is optional
-
+        self.atk_sound = atk_sound
         self.right_image = None
         self.left_image = None
-
         self.wandering = False
 
     def render(self, surface, overlay_surface, pos):
@@ -308,8 +306,8 @@ class AIEntity(Entity):
         spread = list(filter(self.can_spread, world.entities))
         for other in spread:
             dir = self.pos - other.pos
-            scalar = 1 / (dir.mag() + 0.1)  # Spread away more from closer entities
-            self.accel(dir.norm() * scalar)
+            spread_speed = 1 / (dir.mag() + 0.2)  # Spread away more from closer entities
+            self.accel(dir.norm() * spread_speed)
 
     def attack(self, target_direction, world):
         self.accel(target_direction.norm() * self.follow_weight)
@@ -327,13 +325,15 @@ class AIEntity(Entity):
 
         if len(follow) > 0:
             target = follow[0]
-
             # approach player, but keep at distance until attack is charged
             target_dir = target.pos - self.pos
 
             if self.atk_timer > self.atk_interval + random.randint(-100, 100):
                 self.attack(target_dir, world)
                 self.atk_timer += Globals.delta_time
+
+                if self.atk_sound is not None:
+                    assets.play_sound(self.atk_sound, self.pos, player.pos)
 
                 if self.colliding(target):
                     target.hurt(self.damage, world)
@@ -345,7 +345,6 @@ class AIEntity(Entity):
             else:
                 self.retreat(target, target_dir)
                 self.atk_timer += Globals.delta_time
-
         else:
             self.atk_timer = self.atk_interval
             self.wander(world)
@@ -457,7 +456,7 @@ class ItemEntity(Entity):
         self.collide_func = collide_func # Callback function to run when the player collides
         self.condition = condition # Boolean function that must be true to collect the item
 
-    def hitbox(self):
+    def get_hitbox(self):
         # Bob up and down to indicate that this is a pickup
         freq = 0.004
         amp = 8
