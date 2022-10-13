@@ -6,10 +6,10 @@ import util
 from globals import Globals
 import assets
 
+
 ALLY = 0
 ENEMY = 1
 NEUTRAL = 2
-
 
 def opposes(self, other):
     return ((self.team == ALLY and other.team == ENEMY) \
@@ -18,9 +18,26 @@ def opposes(self, other):
             and (not other.invincible or other.is_player)
 
 
+#  The number of damage done shows up when something is hit
+
+
+def spawn_dmg_indicator(text, pos, vel, time, color):
+
+
+    Entity.dmg_indicators.append({
+        "text": text,
+        "pos": Vec(pos),
+        "vel": Vec(vel),
+        "time": time,
+        "color": color,
+    })
+
+
 class Entity:
+    dmg_indicators = []
+
     def __init__(self, name, image, image_scale=1, team=NEUTRAL, health=None, solid=False, hitbox_size=None,
-                 death_func=None, animate=False):
+                 death_func=None, animate=False, lifetime=-1):
         self.name = name
         self.default_image = image
         self.current_image = None
@@ -48,7 +65,8 @@ class Entity:
         self.world = None
         self.is_player = False
         self.time = 0  # Total time alive in world
-        self.lifetime = -1  # The amount of time able to live before dying. The default value -1 means live forever
+        self.lifetime = lifetime  # The amount of time able to live before dying. The default value -1 means live forever
+
         self.alive = True
         self.frozen_timer = 0
 
@@ -129,10 +147,10 @@ class Entity:
                 pos = Vec(hitbox.centerx, render_rect.top - 13)
                 size = Vec(math.sqrt(self.max_health) * 9, 6)
                 data = self.health / self.max_health
-                util.draw_bar(surface, pos, size, data, fg_color, (0, 0, 0))
+                util.draw_bar(surface, pos, size, data, fg_color, (0, 0, 0), center=True)
 
-        if Globals.debug_mode: # Draw hitbox outlines in debug mode
-            pygame.draw.rect(surface, (255, 255, 255), hitbox, 3)
+        if Globals.debug_mode:  # Draw hitbox outlines in debug mode
+            pygame.draw.rect(surface, (255, 255, 255), hitbox, 2)
 
     def update(self, world, player):
         self.time += Globals.delta_time
@@ -156,8 +174,13 @@ class Entity:
             self.keep_in_bounds(world)
 
          # If time exceeds the desired life time (not the default value -1), remove this entity.
-        if self.time > self.lifetime and self.lifetime != -1:
-            self.alive = False
+        if self.lifetime != -1:
+            if self.time > self.lifetime:
+                self.alive = False
+            else:
+                size = min(1, (self.lifetime - self.time)/125)
+                self.resize(size)
+
 
     def keep_in_bounds(self, world):
         self.pos.x = util.clamp(self.pos.x, self.size.x/2, world.size.x - self.size.x/2)
@@ -185,12 +208,21 @@ class Entity:
         return util.rect_center(self.pos, self.size)
 
     def hurt(self, amount, world):
-        alive = self.health > 0
-        if not self.invincible:
+        if self.invincible:
+            spawn_dmg_indicator("Blocked", self.pos, self.vel + Vec(0, -2), 500, (255, 255, 255))
+
+        else:
             self.health -= amount
             self.health = max(0, self.health)
             self.shake_timer = 150
-        if self.health <= 0 and alive:
+
+            text_color = (255, 255, 0)
+            if self.team == ALLY:
+                text_color = (255, 125, 125)
+
+            spawn_dmg_indicator(amount, self.pos, self.vel + Vec(0, -2), 500, text_color)
+
+        if self.health <= 0 and self.alive:
             if self.death_func is not None:
                 self.death_func(self, world, self.team)
             self.alive = False
@@ -200,7 +232,7 @@ class Entity:
 
 
 class Portal(Entity):
-    """ Sends the player to a desired world, position, or entity when interacted with (SPACE or right click)"""
+    """ Sends the player to a desired world, position, or entity when interacted with (SPACE)"""
 
     def __init__(self, name, image, image_scale, team=NEUTRAL, health=None, hover_message="",
                  to_world=None, to_position=None, to_entity=None, solid=False,
@@ -272,10 +304,6 @@ class AIEntity(Entity):
 
         super().render(surface, overlay_surface, pos)
 
-        """render_rect = self.hitbox().copy()
-        render_rect.center = pos.tuple()
-        util.write(surface, self.name, assets.MAIN_FONT, 22, Vec(render_rect.centerx, render_rect.top - 35), (255, 255, 255), center=True)"""
-
     def in_range(self, other):
         return Vec.dist(self.pos, other.pos) <= self.sight_range
 
@@ -319,7 +347,6 @@ class AIEntity(Entity):
         magnitude = self.vel.mag() / self.speed + 0.5
         self.accel(radius_dir.norm() * self.follow_weight * magnitude)
 
-
     def update(self, world, player):
         follow = list(filter(self.can_follow, world.entities))
 
@@ -338,7 +365,7 @@ class AIEntity(Entity):
                 if self.colliding(target):
                     target.hurt(self.damage, world)
                     if target.take_knockback:
-                        target.accel((target.pos - self.pos) * 0.005)
+                        target.accel((target.pos - self.pos) * 0.001)
                         # pygame.mixer.Sound.play(assets.random_hit_sfx())
                     assets.play_sound(assets.random_hit_sfx(), self.pos, player.pos)
                     self.atk_timer = 0
@@ -373,11 +400,11 @@ class RangedAIEntity(AIEntity):
         self.accel(radius_dir.norm() * self.follow_weight * magnitude)
 
 
-
 class Projectile(Entity):
     def __init__(self, name, image, image_scale, speed, team, health, damage, direction, Range, parent=None,
-                 blockable=True, rotate=True, death_func=None, collide_func=None, hitbox_size=None):
-        super().__init__(name, image, image_scale, team, health, death_func=death_func, hitbox_size=hitbox_size)
+                 blockable=True, rotate=True, death_func=None, collide_func=None, hitbox_size=None, lifetime=-1):
+
+        super().__init__(name, image, image_scale, team, health, death_func=death_func, hitbox_size=hitbox_size, lifetime=lifetime)
         self.speed = speed
         self.damage = damage
         self.vel = direction.norm() * self.speed
@@ -455,13 +482,17 @@ class ItemEntity(Entity):
         super().__init__(name, image, image_scale)
         self.collide_func = collide_func # Callback function to run when the player collides
         self.condition = condition # Boolean function that must be true to collect the item
+        self.speed = 0.3
 
-    def get_hitbox(self):
+    def update(self, world, player):
+        super().update(world, player)
+        avoid_player = (self.pos - player.pos).norm() # make items move away from player
+        trend_toward_center = (world.size/2 - self.pos).norm()
         # Bob up and down to indicate that this is a pickup
-        freq = 0.004
-        amp = 8
-        offset = Vec(0, math.sin(self.time * freq) * amp)
-        return util.rect_center(self.pos + offset, self.size)
+        freq = 0.005
+        amp = 0.05
+        bobbing = Vec(0, math.sin(self.time * freq) * amp)
+        self.vel = bobbing
 
     def collide(self, other, world):
         super().collide(other, world)
