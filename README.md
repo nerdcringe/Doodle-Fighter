@@ -1,4 +1,4 @@
-# lifesim
+# Doodle Fighter
 
 Just a little guy moving around in a little world.
 
