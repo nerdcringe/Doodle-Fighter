@@ -1,6 +1,6 @@
 # Doodle Fighter
 
-Just a little guy moving around in a little world.
+You're just a little guy moving around in a little world. Explore new worlds and pick up unique items.
 
 You might meet some enemies along the way...
 
@@ -16,4 +16,4 @@ You might meet some enemies along the way...
 
 ...it's up to you.
 
-Made with Pygame (https://www.pygame.org/contribute.html)
+Made with Pygame (https://www.pygame.org/contribute.html).
